@@ -1,0 +1,45 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment files
+.env
+*.env
+.env.local
+.env.development
+.env.production
+.env.example
+family-tree-only.env
+
+# Logs
+logs/
+*.log
+*.out
+*.err
+
+# Build outputs
+dist/
+build/
+.cache/
+.next/
+out/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Firebase and other temporary folders
+.firebase/
+functions/node_modules/
