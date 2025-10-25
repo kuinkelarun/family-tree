@@ -106,7 +106,7 @@ export default function TreeBoard({
     if (maximized && rfInstance) {
       // allow layout to settle then fit view
       const t = setTimeout(() => {
-        try { rfInstance.fitView({ padding: 0.1 }); } catch {}
+        try { rfInstance.fitView({ padding: 0.1 }); } catch (err) { /* ignore fit errors */ }
       }, 80);
       return () => clearTimeout(t);
     }
@@ -122,31 +122,34 @@ export default function TreeBoard({
         <button onClick={addPerson} disabled={!canAdd} style={{ padding: '6px 10px', borderRadius: 6, background: canAdd ? '#1f6feb' : '#94a3b8', color: '#fff', border: 'none', cursor: canAdd ? 'pointer' : 'not-allowed' }}>
           + Add Node
         </button>
-        <span style={{ color: '#64748b', fontSize: 12, flex: 1 }}>
+        <span style={{ color: '#64748b', fontSize: 12, flex: '1 1 0', minWidth: 0 }}>
           Drag to pan, scroll to zoom, connect nodes to add edges
         </span>
-        <span style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, color: '#64748b' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+
+        {/* Right-aligned, responsive legend: items will wrap on small widths */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 11, color: '#64748b', justifyContent: 'flex-end', flexWrap: 'wrap', minWidth: 0, maxWidth: '48%' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 14, height: 2, background: '#10b981', borderRadius: 1 }}></div>
             parent
           </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 14, height: 2, background: '#10b981', borderRadius: 1 }}></div>
             child
           </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 14, height: 2, background: '#ec4899', borderRadius: 1 }}></div>
             spouse
           </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 14, height: 2, background: '#3b82f6', borderRadius: 1 }}></div>
             sibling
           </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 14, height: 2, background: '#8b5cf6', borderRadius: 1 }}></div>
             custom
           </span>
-        </span>
+        </div>
+
         <button onClick={() => setMaximized((m) => !m)} style={{ padding: '6px 10px', borderRadius: 6, background: '#0f172a', color: '#fff', border: 'none' }}>
           {maximized ? 'Exit Fullscreen' : 'Maximize'}
         </button>

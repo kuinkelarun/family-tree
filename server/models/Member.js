@@ -36,6 +36,7 @@ const MemberSchema = new mongoose.Schema(
     name: { type: String, required: true, index: true },
     dob: { type: Date },
     photo: { type: String },
+  location: { type: String },
     position: { type: PositionSchema, default: null },
     relationships: { type: [RelationshipSchema], default: [] },
     notes: { type: String },

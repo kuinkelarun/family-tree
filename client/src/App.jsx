@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import './App.css';
 import Sidebar from './components/Sidebar.jsx';
 import TreeBoard from './components/TreeBoard.jsx';
-import MemberForm from './components/MemberForm.jsx';
+import MemberModal from './components/MemberModal.jsx';
 import RelationshipPicker from './components/RelationshipPicker.jsx';
 import EdgeEditorPopover from './components/EdgeEditorPopover.jsx';
 import { api, Auth, Trees, Members, Relationships, Users, getToken, setToken, getTreeId, setTreeId } from './utils/api.js';
@@ -239,6 +239,13 @@ function App() {
   }
 
   const [relPicker, setRelPicker] = useState({ open: false, source: '', target: '' });
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Debug: log when modal state changes to verify wiring in the UI
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[UI Debug] MemberModal open =', modalOpen, 'selectedId =', selectedId);
+  }, [modalOpen, selectedId]);
 
   function handleConnectEdge(params) {
     if (!treeId) return;
@@ -262,6 +269,7 @@ function App() {
 
   function handleSelectNode(id) {
     setSelectedId(String(id || ''));
+    if (id) setModalOpen(true);
   }
 
   function selectedMember() {
@@ -290,6 +298,7 @@ function App() {
       }
       await loadTree(treeId);
       setSelectedId(''); // Clear selection after save
+      setModalOpen(false);
     } catch (e) {
       showToast(`Save member failed: ${e.message}`);
     }
@@ -315,6 +324,7 @@ function App() {
         setSelectedId('');
         await loadTree(treeId);
         showToast(`${memberName} permanently deleted`);
+        setModalOpen(false);
       } catch (e) {
         showToast(`Delete failed: ${e.message}`);
       }
@@ -331,6 +341,7 @@ function App() {
         setSelectedId('');
         await loadTree(treeId);
         showToast(`${memberName} moved to Member Pool`);
+        setModalOpen(false);
       } catch (e) {
         showToast(`Failed to remove from canvas: ${e.message}`);
       }
@@ -369,6 +380,16 @@ function App() {
     setTimeout(() => setToast(''), 2500);
   }
 
+  // Modal helpers
+  function openNewMemberModal() {
+    setSelectedId('');
+    setModalOpen(true);
+  }
+  function closeMemberModal() {
+    setModalOpen(false);
+    // don't clear selection here; caller does it as needed
+  }
+
   // Edge editing and export helpers
   const [edgeEditor, setEdgeEditor] = useState({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0 });
   function handleEdgeClick(e, edge) {
@@ -402,7 +423,7 @@ function App() {
   const exportRef = useRef(null);
   function makeFilename(ext) {
     const title = treeMeta?.title?.trim() || 'family-tree';
-    const safeTitle = title.replace(/[^a-z0-9\- _\.]/gi, '').replace(/\s+/g, ' ').trim();
+  const safeTitle = title.replace(/[^a-z0-9\- _.]/gi, '').replace(/\s+/g, ' ').trim();
     const date = new Date();
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -453,12 +474,17 @@ function App() {
         members={members}
         nodesOnCanvas={nodes.map(n => n.id)}
         onAddMemberToCanvas={handleAddMemberToCanvas}
-        onSelectMember={(id) => setSelectedId(id)}
+        onSelectMember={(id) => { setSelectedId(id); setModalOpen(true); }}
         onDeleteMember={canEdit ? handleDeleteMember : undefined}
+        onAddNewMember={openNewMemberModal}
       />
       <main style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0 }}>Family Tree Builder</h1>
+          {/* Visible tag to verify latest UI is loaded */}
+          <span style={{ fontSize: 11, background: '#8b5cf6', color: '#fff', padding: '2px 6px', borderRadius: 6 }}>
+            UI updates active
+          </span>
           <span style={{ color: '#666', fontSize: 14 }}>
             API: {API_BASE ? API_BASE : 'via proxy /api'}
           </span>
@@ -519,15 +545,16 @@ function App() {
             onClose={cancelEdgeEdit}
           />
         )}
-        <div style={{ marginTop: 16 }}>
-          <MemberForm
-            selectedMember={selectedMember()}
-            onSave={handleSaveMember}
-            canSave={!!(token && treeId && canEdit)}
-            onClearSelection={() => setSelectedId('')}
-            onDelete={canEdit ? handleDeleteMember : undefined}
-          />
-        </div>
+        {/* Unified Add/Edit Modal */}
+        <MemberModal
+          open={modalOpen}
+          member={selectedMember()}
+          onSave={(payload) => handleSaveMember(payload)}
+          onClose={() => { closeMemberModal(); setSelectedId(''); }}
+          canSave={!!(token && treeId && canEdit)}
+          onDelete={canEdit ? (id) => handleDeleteMember(id, true) : undefined}
+          onMoveToPool={canEdit ? (id) => handleDeleteMember(id, false) : undefined}
+        />
         {toast && (
           <div style={{ position: 'fixed', right: 16, top: 16, background: '#111827', color: '#fff', padding: '10px 12px', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 1000 }}>
             {toast}

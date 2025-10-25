@@ -3,12 +3,13 @@ import React, { useEffect, useState } from 'react';
 export default function RelationshipPicker({ open, onCancel, onConfirm, onDelete, defaultType = 'custom', defaultLabel = '' }) {
   const [type, setType] = useState(defaultType);
   const [label, setLabel] = useState(defaultLabel);
-  if (!open) return null;
   useEffect(() => {
+    if (!open) return; // don't register when closed
     const onKey = (e) => { if (e.key === 'Escape') onCancel?.(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+  }, [onCancel, open]);
+  if (!open) return null;
   return (
     <div onClick={() => onCancel?.()} style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#ffffff', color: '#111827', borderRadius: 10, padding: 16, width: 340, boxShadow: '0 8px 24px rgba(0,0,0,0.25)', border: '1px solid #e5e7eb' }} role="dialog" aria-modal="true">

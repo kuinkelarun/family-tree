@@ -26,6 +26,7 @@ export const memberCreateSchema = z.object({
   photo: z.string().url().optional(),
   position: positionSchema.optional(),
   notes: z.string().optional(),
+  location: z.string().optional(),
   occupation: z.string().optional(),
   events: z
     .array(
@@ -46,6 +47,7 @@ export const memberUpdateSchema = z.object({
   photo: z.string().url().optional(),
   position: positionSchema.nullable().optional(), // ⬅ Allow null to clear position
   notes: z.string().optional(),
+  location: z.string().optional(),
   occupation: z.string().optional(),
   events: z
     .array(

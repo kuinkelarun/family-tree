@@ -5,7 +5,8 @@ export default function Sidebar({
   nodesOnCanvas = [], 
   onAddMemberToCanvas,
   onSelectMember,
-  onDeleteMember 
+  onDeleteMember,
+  onAddNewMember,
 }) {
   // Members that are NOT yet on canvas
   const membersNotOnCanvas = members.filter(m => !nodesOnCanvas.includes(m._id));
@@ -17,13 +18,6 @@ export default function Sidebar({
     e.dataTransfer.setData('application/reactflow', 'member');
     e.dataTransfer.setData('memberId', member._id);
     e.dataTransfer.effectAllowed = 'move';
-  }
-
-  function handleDeleteFromPool(member, e) {
-    e.stopPropagation(); // Prevent drag from triggering
-    if (onDeleteMember) {
-      onDeleteMember(member._id, true); // Delete entirely (from pool)
-    }
   }
 
   return (
@@ -45,12 +39,20 @@ export default function Sidebar({
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }}></span>
             Member Pool ({membersNotOnCanvas.length})
           </strong>
+          <div style={{ marginTop: 8, marginBottom: 8 }}>
+            <button
+              onClick={() => onAddNewMember?.()}
+              style={{ padding: '6px 10px', borderRadius: 6, background: '#2563eb', color: '#fff', border: 'none' }}
+            >
+              + Add New Member
+            </button>
+          </div>
           <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, marginBottom: 8 }}>
-            Drag to canvas or click to add
+            Use "+ Add New Member" to create; drag to canvas or click a member to edit
           </div>
           {membersNotOnCanvas.length === 0 ? (
             <div style={{ padding: 12, background: '#f9fafb', borderRadius: 6, fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>
-              No members in pool. Use "Add New Member" form below to create members.
+              No members in pool. Use the "+ Add New Member" button above to create members.
             </div>
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0 0', display: 'grid', gap: 6 }}>
@@ -59,12 +61,13 @@ export default function Sidebar({
                   key={m._id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, m)}
+                  onClick={() => onSelectMember?.(m._id)}
                   style={{
                     padding: '8px 10px',
                     background: '#ffffff',
                     border: '1px solid #e5e7eb',
                     borderRadius: 6,
-                    cursor: 'grab',
+                    cursor: 'pointer',
                     fontSize: 13,
                     color: '#1f2937',
                     display: 'flex',
@@ -84,7 +87,7 @@ export default function Sidebar({
                   <span style={{ fontWeight: 500, flex: 1 }}>{m.name || 'Unnamed'}</span>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button
-                      onClick={() => onAddMemberToCanvas?.(m)}
+                      onClick={(e) => { e.stopPropagation(); onAddMemberToCanvas?.(m); }}
                       style={{
                         padding: '2px 8px',
                         fontSize: 11,
@@ -97,21 +100,6 @@ export default function Sidebar({
                       title="Add to canvas"
                     >
                       + Add
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteFromPool(m, e)}
-                      style={{
-                        padding: '2px 8px',
-                        fontSize: 11,
-                        borderRadius: 4,
-                        background: '#dc2626',
-                        color: '#fff',
-                        border: 'none',
-                        cursor: 'pointer',
-                      }}
-                      title="Delete member permanently"
-                    >
-                      🗑️
                     </button>
                   </div>
                 </li>
