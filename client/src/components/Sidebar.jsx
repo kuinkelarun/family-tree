@@ -47,9 +47,9 @@ export default function Sidebar({
               + Add New Member
             </button>
           </div>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, marginBottom: 8 }}>
+          {/* <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, marginBottom: 8 }}>
             Use "+ Add New Member" to create; drag to canvas or click a member to edit
-          </div>
+          </div> */}
           {membersNotOnCanvas.length === 0 ? (
             <div style={{ padding: 12, background: '#f9fafb', borderRadius: 6, fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>
               No members in pool. Use the "+ Add New Member" button above to create members.
