@@ -481,13 +481,7 @@ function App() {
       <main style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0 }}>Family Tree Builder</h1>
-          {/* Visible tag to verify latest UI is loaded */}
-          <span style={{ fontSize: 11, background: '#8b5cf6', color: '#fff', padding: '2px 6px', borderRadius: 6 }}>
-            UI updates active
-          </span>
-          <span style={{ color: '#666', fontSize: 14 }}>
-            API: {API_BASE ? API_BASE : 'via proxy /api'}
-          </span>
+          {/* Header is kept minimal; debug/info moved to the footer details */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             {isAuthed ? (
               <>
@@ -560,6 +554,7 @@ function App() {
             {toast}
           </div>
         )}
+        
       </main>
     </div>
   );

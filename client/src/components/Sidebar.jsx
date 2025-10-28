@@ -23,12 +23,7 @@ export default function Sidebar({
   return (
     <aside style={{ width: 240, padding: 16, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <h2 style={{ marginTop: 0, fontSize: 20, color: '#111827' }}>Family Tree</h2>
-      <button onClick={onCheckApi} style={{ padding: '8px 12px', borderRadius: 6, background: '#1f6feb', color: '#fff', border: 'none', fontSize: 13 }}>
-        Check API Health
-      </button>
-      <div style={{ marginTop: 8, fontSize: 12, color: apiStatus === 'ok' ? '#10b981' : '#6b7280' }}>
-        API: {apiStatus || 'unknown'}
-      </div>
+      {/* Left pane control area intentionally minimal for production: no debug controls */}
       
       <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
       
