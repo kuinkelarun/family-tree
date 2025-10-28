@@ -44,13 +44,16 @@ export default function MemberModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      name: name.trim(),
-      dob: dob || '',
-      photo: photo?.trim() || '',
-      notes,
-      location,
-    };
+    const payload = { name: name.trim() };
+    if (dob && String(dob).trim()) payload.dob = dob;
+    if (photo && String(photo).trim()) payload.photo = String(photo).trim();
+    if (notes && String(notes).trim()) payload.notes = notes;
+    if (location && String(location).trim()) payload.location = location;
+
+    // Debug: log the payload being submitted (helps track 400 validation issues)
+    // eslint-disable-next-line no-console
+    console.log('[MemberModal] submit payload:', payload);
+
     onSave && onSave(payload);
   };
 
