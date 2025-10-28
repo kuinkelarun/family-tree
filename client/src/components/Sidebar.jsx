@@ -21,7 +21,7 @@ export default function Sidebar({
   }
 
   return (
-    <aside style={{ width: 320, padding: 16, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <aside style={{ width: 240, padding: 16, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <h2 style={{ marginTop: 0, fontSize: 20, color: '#111827' }}>Family Tree</h2>
       <button onClick={onCheckApi} style={{ padding: '8px 12px', borderRadius: 6, background: '#1f6feb', color: '#fff', border: 'none', fontSize: 13 }}>
         Check API Health
