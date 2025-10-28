@@ -288,6 +288,7 @@ export default function MemberModal({
                         flex: 1,
                         minWidth: 160,
                         padding: '10px 14px',
+                        height: '44px',
                         fontSize: 14,
                         border: '2px solid #e5e7eb',
                         borderRadius: 8,
@@ -343,7 +344,7 @@ export default function MemberModal({
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       style={{
-                        padding: '10px 14px',
+                        padding: '9px 12px',
                         fontSize: 14,
                         border: '2px solid #e5e7eb',
                         borderRadius: 8,
@@ -352,7 +353,7 @@ export default function MemberModal({
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         whiteSpace: 'nowrap',
-                        height: 'auto'
+                        height: '44px'
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e7eb'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
@@ -470,6 +471,7 @@ export default function MemberModal({
                       background: '#ffffff',
                       transition: 'all 0.2s',
                       padding: '10px 14px',
+                      height: '44px',
                       boxSizing: 'border-box',
                       display: 'flex',
                       alignItems: 'center',
@@ -492,6 +494,7 @@ export default function MemberModal({
                       style={{
                         flex: 1,
                         padding: 0,
+                        height: '100%',
                         fontSize: 14,
                         border: 'none',
                         outline: 'none',
@@ -555,6 +558,7 @@ export default function MemberModal({
                     style={{
                       width: '100%',
                       padding: '10px 14px',
+                      height: '44px',
                       fontSize: 14,
                       border: '2px solid #e5e7eb',
                       borderRadius: 8,
