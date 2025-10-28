@@ -52,7 +52,15 @@ export async function updateMember(req, res) {
     }
     
     // Apply other fields
-    const { position, ...otherData } = parsed.data;
+    const { position, photo, ...otherData } = parsed.data;
+    // Handle photo clearing or update explicitly
+    if (parsed.data.hasOwnProperty('photo')) {
+      if (photo === '' || photo === null) {
+        member.photo = undefined;
+      } else if (typeof photo === 'string') {
+        member.photo = photo;
+      }
+    }
     Object.assign(member, otherData);
     
     await member.save();

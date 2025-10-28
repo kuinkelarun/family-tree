@@ -26,6 +26,7 @@ import treeRoutes from './routes/trees.js';
 import memberRoutes from './routes/members.js';
 import relationshipRoutes from './routes/relationships.js';
 import aiRoutes from './routes/ai.js';
+import uploadRoutes from './routes/uploads.js';
 
 // Load env from server/.env first, then project-root custom env files as fallback
 const __filename = fileURLToPath(import.meta.url);
@@ -37,7 +38,8 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+// Increase JSON body limit to support base64 image uploads
+app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 
 // Health check
@@ -83,6 +85,9 @@ app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
   res.json({ name: 'family-tree-api', version: '0.1.0' });
 });
 
+// Static uploads (serve user files)
+app.use('/uploads', express.static(path.resolve(__dirname, 'uploads')));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -90,6 +95,7 @@ app.use('/api/trees', treeRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/relationships', relationshipRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 const PORT = process.env.PORT || 4000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/family_tree';

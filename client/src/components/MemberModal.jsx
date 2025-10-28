@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { api } from '../utils/api.js';
 
 export default function MemberModal({
   open,
@@ -15,6 +16,8 @@ export default function MemberModal({
   const [photo, setPhoto] = useState('');
   const [notes, setNotes] = useState('');
   const [location, setLocation] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const isOnCanvas = !!(
     member && member.position &&
@@ -46,10 +49,18 @@ export default function MemberModal({
     if (!onSave) return;
     const payload = {
       name: name.trim(),
-      photo: photo.trim() || undefined,
-      notes: notes.trim() || undefined,
-      location: location.trim() || undefined,
     };
+    const photoVal = photo.trim();
+    // For edits, send empty string to explicitly clear on server; for create, omit when empty
+    if (isEdit) {
+      payload.photo = photoVal === '' ? '' : photoVal;
+    } else if (photoVal) {
+      payload.photo = photoVal;
+    }
+    const notesVal = notes.trim();
+    if (notesVal) payload.notes = notesVal;
+    const locationVal = location.trim();
+    if (locationVal) payload.location = locationVal;
     if (dob) payload.dob = dob;
     await onSave(payload);
   }
@@ -277,13 +288,13 @@ export default function MemberModal({
 
           <label style={{ display: 'grid', gap: 6 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
-              🖼️ Photo URL
+              🖼️ Photo URL or Upload Path
             </span>
             <input 
               value={photo} 
               onChange={(e) => setPhoto(e.target.value)} 
-              type="url" 
-              placeholder="https://example.com/photo.jpg"
+              type="text" 
+              placeholder="https://example.com/photo.jpg or /uploads/your-file.jpg"
               style={{ 
                 width: '100%', 
                 padding: '10px 14px', 
@@ -296,9 +307,68 @@ export default function MemberModal({
                 color: '#1f2937',
                 boxSizing: 'border-box'
               }}
+              onInput={(e) => {
+                const input = e.currentTarget;
+                const val = input.value.trim();
+                if (!val) { input.setCustomValidity(''); return; }
+                const ok = /^https?:\/\//i.test(val) || /^\/uploads\//.test(val);
+                input.setCustomValidity(ok ? '' : 'Enter a full URL (https://...) or an uploaded path like /uploads/filename.jpg');
+              }}
               onFocus={(e) => { e.target.style.borderColor = '#667eea'; e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'; }}
               onBlur={(e) => { e.target.style.borderColor = '#e5e7eb'; e.target.style.boxShadow = 'none'; }}
             />
+            <span style={{ fontSize: 12, color: '#6b7280' }}>Tip: paste a https:// image URL or use the uploader below to get a /uploads/... path.</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: '#6b7280' }}>or upload a photo:</span>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={async (e) => {
+                  const f = e.target.files && e.target.files[0];
+                  if (!f) return;
+                  setUploadError('');
+                  try {
+                    // Read as data URL
+                    const dataUrl = await new Promise((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(reader.result);
+                      reader.onerror = reject;
+                      reader.readAsDataURL(f);
+                    });
+                    setUploading(true);
+                    const resp = await api('/api/uploads', { method: 'POST', body: { dataUrl } });
+                    setPhoto(resp.url || '');
+                  } catch (err) {
+                    setUploadError(err?.message || 'Upload failed');
+                  } finally {
+                    setUploading(false);
+                    // reset input so same file can be chosen again if needed
+                    e.target.value = '';
+                  }
+                }}
+              />
+              {uploading && <span style={{ fontSize: 12, color: '#1f6feb' }}>Uploading…</span>}
+              {uploadError && <span style={{ fontSize: 12, color: '#dc2626' }}>{uploadError}</span>}
+            </div>
+            {photo?.trim() ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', background: '#f3f4f6' }}>
+                  <img 
+                    src={photo} 
+                    alt="Photo preview" 
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    onError={(e) => { 
+                      e.currentTarget.style.display = 'none'; 
+                      const box = e.currentTarget.parentElement; 
+                      if (box) { box.style.background = '#fee2e2'; box.style.borderColor = '#fecaca'; }
+                    }}
+                  />
+                </div>
+                <a href={photo} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#1f6feb' }}>Open image</a>
+              </div>
+            ) : null}
           </label>
 
           <label style={{ display: 'grid', gap: 6 }}>

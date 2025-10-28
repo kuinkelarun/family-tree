@@ -23,7 +23,11 @@ export const memberCreateSchema = z.object({
   tree: z.string().min(1),
   name: z.string().min(1),
   dob: z.string().optional(),
-  photo: z.string().url().optional(),
+  // Support either a full URL (https://...) or a relative upload path (/uploads/filename)
+  photo: z.union([
+    z.string().url(),
+    z.string().regex(/^\/uploads\//),
+  ]).optional(),
   position: positionSchema.optional(),
   notes: z.string().optional(),
   location: z.string().optional(),
@@ -44,7 +48,14 @@ export const memberUpdateSchema = z.object({
   tree: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
   dob: z.string().optional(),
-  photo: z.string().url().optional(),
+  // Allow clearing photo by accepting empty string or null
+  // and support either full URL or relative /uploads path when provided
+  photo: z.union([
+    z.string().url(),
+    z.string().regex(/^\/uploads\//),
+    z.literal(''),
+    z.null(),
+  ]).optional(),
   position: positionSchema.nullable().optional(), // ⬅ Allow null to clear position
   notes: z.string().optional(),
   location: z.string().optional(),
