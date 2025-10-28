@@ -27,62 +27,35 @@ export default function MemberModal({
     typeof member.position.x === 'number' &&
     typeof member.position.y === 'number'
   );
-
   useEffect(() => {
-    if (!open) return;
-    if (member) {
-      setName(member.name || '');
-      setDob(member.dob ? new Date(member.dob).toISOString().slice(0, 10) : '');
-      setPhoto(member.photo || '');
-      setNotes(member.notes || '');
-      setLocation(member.location || '');
-    } else {
-      setName('');
-      setDob('');
-      setPhoto('');
-      setNotes('');
-      setLocation('');
+    if (open) {
+      setName(member?.name || '');
+      const isoDob = member?.dob ? new Date(member.dob).toISOString().slice(0, 10) : '';
+      setDob(isoDob);
+      setPhoto(member?.photo || '');
+      setNotes(member?.notes || '');
+      setLocation(member?.location || '');
+      setLightboxOpen(false);
+      setPhotoEditOpen(false);
+      setUploadError('');
+      setUploading(false);
     }
   }, [open, member]);
 
-  // Ensure any sub-overlays are closed when the main modal opens/closes
-  useEffect(() => {
-    setPhotoEditOpen(false);
-    setLightboxOpen(false);
-  }, [open]);
-
-  // Close lightbox on Escape
-  useEffect(() => {
-    if (!lightboxOpen) return;
-    function onKey(e) {
-      if (e.key === 'Escape') setLightboxOpen(false);
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [lightboxOpen]);
-
-  if (!open) return null;
-
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!onSave) return;
     const payload = {
       name: name.trim(),
+      dob: dob || '',
+      photo: photo?.trim() || '',
+      notes,
+      location,
     };
-    const photoVal = photo.trim();
-    // For edits, send empty string to explicitly clear on server; for create, omit when empty
-    if (isEdit) {
-      payload.photo = photoVal === '' ? '' : photoVal;
-    } else if (photoVal) {
-      payload.photo = photoVal;
-    }
-    const notesVal = notes.trim();
-    if (notesVal) payload.notes = notesVal;
-    const locationVal = location.trim();
-    if (locationVal) payload.location = locationVal;
-    if (dob) payload.dob = dob;
-    await onSave(payload);
-  }
+    onSave && onSave(payload);
+  };
+
+  // Don't render the modal UI unless it's open
+  if (!open) return null;
 
   return (
     <div 
@@ -514,35 +487,7 @@ export default function MemberModal({
                         container.style.boxShadow = 'none';
                       }}
                     />
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        const input = e.currentTarget.previousElementSibling;
-                        input.showPicker?.();
-                      }}
-                      style={{
-                        padding: '4px 8px',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: 16,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 4,
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#f3f4f6';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                      title="Open calendar"
-                    >
-                      📅
-                    </button>
+                    {/* Using the built-in calendar indicator only; removed custom trigger button */}
                   </div>
                 </label>
 

@@ -30,16 +30,6 @@ body {
   background: #f8fafc; /* keep page background light */
 }
 
-/* Date input: hide native calendar icon so we only show our small 'open picker' button */
-input[type="date"]::-webkit-calendar-picker-indicator {
-  display: none !important;
-  -webkit-appearance: none;
-}
-input[type="date"] {
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
-}
 
 h1 {
   font-size: 3.2em;
