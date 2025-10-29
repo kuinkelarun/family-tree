@@ -10,19 +10,25 @@ import ReactFlow, {
   useEdgesState,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import FamilyNode from './FamilyNode';
+
+// Keep nodeTypes stable across renders to avoid React Flow warnings
+const nodeTypes = { familyNode: FamilyNode };
 
 const initialNodes = [
-  { id: 'me', position: { x: 0, y: 0 }, data: { label: 'You' }, type: 'default' },
-  { id: 'spouse', position: { x: 220, y: 0 }, data: { label: 'Spouse' }, type: 'default' },
-  { id: 'child1', position: { x: 110, y: 120 }, data: { label: 'Child' }, type: 'default' },
-  { id: 'parent', position: { x: 0, y: -140 }, data: { label: 'Parent' }, type: 'default' },
+  { id: 'me', position: { x: 0, y: 0 }, data: { label: 'You' }, type: 'familyNode' },
+  { id: 'spouse', position: { x: 220, y: 0 }, data: { label: 'Spouse' }, type: 'familyNode' },
+  { id: 'child1', position: { x: 110, y: 120 }, data: { label: 'Child' }, type: 'familyNode' },
+  { id: 'parent', position: { x: 0, y: -140 }, data: { label: 'Parent' }, type: 'familyNode' },
 ];
 
 const initialEdges = [
-  { id: 'e1', source: 'me', target: 'spouse', type: 'smoothstep', label: 'spouse' },
-  { id: 'e2', source: 'me', target: 'child1', type: 'smoothstep', label: 'parent' },
-  { id: 'e3', source: 'spouse', target: 'child1', type: 'smoothstep', label: 'parent' },
-  { id: 'e4', source: 'parent', target: 'me', type: 'smoothstep', label: 'parent' },
+  // spouse: single direction pointing to target
+  { id: 'e1', source: 'me', target: 'spouse', type: 'smoothstep', label: 'spouse', markerEnd: { type: 'arrowclosed', color: '#111827' } },
+  // parent: single pointer to target
+  { id: 'e2', source: 'me', target: 'child1', type: 'smoothstep', label: 'parent', markerEnd: { type: 'arrowclosed', color: '#111827' } },
+  { id: 'e3', source: 'spouse', target: 'child1', type: 'smoothstep', label: 'parent', markerEnd: { type: 'arrowclosed', color: '#111827' } },
+  { id: 'e4', source: 'parent', target: 'me', type: 'smoothstep', label: 'parent', markerEnd: { type: 'arrowclosed', color: '#111827' } },
 ];
 
 export default function TreeBoard({ 
@@ -55,18 +61,83 @@ export default function TreeBoard({
   const [counter, setCounter] = useState(1);
   const [maximized, setMaximized] = useState(false);
   const [rfInstance, setRfInstance] = useState(null);
+  const [notice, setNotice] = useState('');
 
-  const onConnect = useCallback((params) => {
+  // Normalize any connection so that the final edge always points from a node's "source" handle to the other node's "target" handle.
+  // This prevents flipped directions when users start dragging from a target handle by accident (e.g., right-side target dot).
+  const normalizeConnection = useCallback((p) => {
+    const sh = String(p.sourceHandle || '');
+    const th = String(p.targetHandle || '');
+    const sourceIsSource = sh.includes('source');
+    const targetIsTarget = th.includes('target');
+    if (sourceIsSource && targetIsTarget) return p; // already correct
+
+    const sourceIsTarget = sh.includes('target');
+    const targetIsSource = th.includes('source');
+    if (sourceIsTarget && targetIsSource) {
+      // fully reversed -> swap ends
+      return {
+        ...p,
+        source: p.target,
+        target: p.source,
+        sourceHandle: p.targetHandle,
+        targetHandle: p.sourceHandle,
+      };
+    }
+    // Partially mismatched (loose mode can allow odd combos) -> prefer swapping to enforce source->target semantics
+    return {
+      ...p,
+      source: p.target,
+      target: p.source,
+      sourceHandle: p.targetHandle,
+      targetHandle: p.sourceHandle,
+    };
+  }, []);
+
+  const onConnect = useCallback((rawParams) => {
+    // Normalize so we always end up with source(handle: *-source) -> target(handle: *-target)
+    // but preserve whichever side handles the user picked (top/right/bottom/left)
+    const params = normalizeConnection(rawParams);
     if (onConnectExt) return onConnectExt(params);
-    setEdges((eds) => addEdge({ ...params, type: 'smoothstep' }, eds));
-  }, [setEdges, onConnectExt]);
+    // Prevent duplicate edges (same source -> target)
+    setEdges((eds) => {
+      const alreadyExact = eds.some((e) => e.source === params.source && e.target === params.target && e.sourceHandle === params.sourceHandle && e.targetHandle === params.targetHandle);
+      if (alreadyExact) {
+        setNotice('Duplicate connection ignored');
+        return eds;
+      }
+      // Near-duplicate policy: reject if same source->target regardless of handles
+      const alreadySamePair = eds.some((e) => e.source === params.source && e.target === params.target);
+      if (alreadySamePair) {
+        setNotice('Connection already exists between these nodes');
+        return eds;
+      }
+
+      // Add only the forward directed edge with an arrow marker to indicate source -> target.
+      const forward = { ...params, id: `e-${params.source}-${params.target}-${Date.now()}`, type: 'smoothstep', markerEnd: { type: 'arrowclosed', color: '#111827' } };
+      return addEdge(forward, eds);
+    });
+  }, [setEdges, onConnectExt, nodes, normalizeConnection]);
+
+  // Allow updating an edge by dragging its handle to another node
+  const onEdgeUpdate = useCallback((oldEdge, newConnectionRaw) => {
+    const newConnection = normalizeConnection(newConnectionRaw);
+    setEdges((eds) => eds.map((e) => (e.id === oldEdge.id ? { ...e, source: newConnection.source, target: newConnection.target, sourceHandle: newConnection.sourceHandle, targetHandle: newConnection.targetHandle } : e)));
+  }, [setEdges, normalizeConnection]);
+
+  // small duplicate notice
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(''), 1500);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   const addPerson = () => {
     if (onAddPersonExt) return onAddPersonExt();
     const id = `new-${Date.now()}-${counter}`;
     const x = 60 + (nodes.length % 6) * 140;
     const y = 60 + Math.floor(nodes.length / 6) * 120;
-    setNodes((nds) => nds.concat({ id, position: { x, y }, data: { label: `Person ${counter}` }, type: 'default' }));
+  setNodes((nds) => nds.concat({ id, position: { x, y }, data: { label: `Person ${counter}` }, type: 'familyNode' }));
     setCounter((c) => c + 1);
   };
 
@@ -161,6 +232,10 @@ export default function TreeBoard({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        nodeTypes={nodeTypes}
+        onEdgeUpdate={onEdgeUpdate}
+        connectionLineType="smoothstep"
+        connectionMode="loose"
           onNodeClick={onNodeClick ? (_e, node) => onNodeClick(node?.id, node) : undefined}
           onNodeDragStop={onNodeDragStop ? (e, node) => onNodeDragStop(node) : undefined}
           onEdgeClick={onEdgeClick ? (e, edge) => onEdgeClick(e, edge) : undefined}
@@ -174,6 +249,11 @@ export default function TreeBoard({
         <Controls position="bottom-left" />
         <Background variant="dots" gap={16} size={1} />
       </ReactFlow>
+      {!!notice && (
+        <div style={{ position: 'absolute', left: 12, bottom: 12, background: '#111827', color: '#fff', padding: '6px 8px', borderRadius: 6, fontSize: 12, boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
+          {notice}
+        </div>
+      )}
       </div>
     </div>
   );

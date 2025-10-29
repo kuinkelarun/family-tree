@@ -106,6 +106,7 @@ function App() {
 
   function mapTreeToGraph(tree) {
     const members = Array.isArray(tree.members) ? tree.members : [];
+    const posById = new Map(members.map(m => [String(m._id), m.position || { x: 0, y: 0 }]))
     
     // ONLY create nodes for members WITH positions (on canvas)
     const n = members
@@ -116,7 +117,8 @@ function App() {
           id: m._id,
           data: { label: m.name || `Member ${idx + 1}` },
           position: { x: m.position.x, y: m.position.y },
-          type: 'default',
+          // use the familyNode custom renderer so left/right handles are available
+          type: 'familyNode',
         };
       });
     
@@ -140,20 +142,72 @@ function App() {
         const label = r.label || type;
         const edgeColor = RELATIONSHIP_COLORS[type] || RELATIONSHIP_COLORS.custom;
         
-        // Candidate edge uses this record's direction (source=src, target=dst)
+  // Display rule: always render edge as SOURCE -> TARGET (arrow points to target)
+  const displaySourceId = String(src);
+  const displayTargetId = String(dst);
+  const srcPos = posById.get(displaySourceId) || { x: 0, y: 0 };
+  const dstPos = posById.get(displayTargetId) || { x: 0, y: 0 };
+        const dx = (dstPos.x || 0) - (srcPos.x || 0);
+        const dy = (dstPos.y || 0) - (srcPos.y || 0);
+
+        function sideForHorizontal(isRight) {
+          return isRight ? 'right' : 'left';
+        }
+        function sideForVertical(isDown) {
+          return isDown ? 'bottom' : 'top';
+        }
+
+        let sourceHandle = undefined;
+        let targetHandle = undefined;
+
+        if (type === 'parent') {
+          // For relationship type "parent": source is the child and target is the parent (upwards)
+          // Draw from source TOP to target BOTTOM
+          sourceHandle = 'top-source';
+          targetHandle = 'bottom-target';
+        } else if (type === 'child') {
+          // For relationship type "child": source is the parent and target is the child (downwards)
+          // Draw from source BOTTOM to target TOP
+          sourceHandle = 'bottom-source';
+          targetHandle = 'top-target';
+        } else if (type === 'spouse' || type === 'sibling') {
+          // horizontal preferred; choose sides based on relative x
+          const srcRight = dx >= 0; // target is to the right
+          sourceHandle = `${sideForHorizontal(srcRight)}-source`;
+          targetHandle = `${sideForHorizontal(!srcRight)}-target`;
+        } else {
+          // custom: choose dominant axis
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            const srcRight = dx >= 0;
+            sourceHandle = `${sideForHorizontal(srcRight)}-source`;
+            targetHandle = `${sideForHorizontal(!srcRight)}-target`;
+          } else {
+            const srcDown = dy >= 0;
+            sourceHandle = `${sideForVertical(srcDown)}-source`;
+            targetHandle = `${sideForVertical(!srcDown)}-target`;
+          }
+        }
+
+  // Configure arrow markers: arrow at the end (target)
+  const markers = { markerEnd: { type: 'arrowclosed', color: edgeColor } };
+
         const candidate = {
           id: `${a}-${b}-${type}`,
-          source: String(src),
-          target: String(dst),
+          // Display edge as TARGET -> SOURCE
+          source: displaySourceId,
+          target: displayTargetId,
           type: 'smoothstep',
           label,
+          sourceHandle,
+          targetHandle,
           labelStyle: { fill: '#111827', fontSize: 12, fontWeight: 600 },
           labelBgStyle: { fill: '#ffffff', fillOpacity: 0.95, stroke: edgeColor, strokeWidth: 1 },
           labelBgPadding: [3, 4],
           labelBgBorderRadius: 4,
           style: { stroke: edgeColor, strokeWidth: 2 },
-          markerEnd: { type: 'arrowclosed', color: edgeColor },
-          data: { type, label },
+          ...markers,
+          // Keep original logical direction for editing APIs
+          data: { type, label, from: String(src), to: String(dst) },
         };
 
         if (!current) {
@@ -395,7 +449,10 @@ function App() {
   function handleEdgeClick(e, edge) {
     const type = edge?.data?.type || (String(edge?.id || '').split('-').pop() || 'custom');
     const label = edge?.data?.label || edge?.label || '';
-    setEdgeEditor({ open: true, source: edge.source, target: edge.target, type, label, x: e.clientX, y: e.clientY });
+    // Use original logical direction for edit operations (from = data.from, to = data.to)
+    const logicalFrom = edge?.data?.from || edge?.source;
+    const logicalTo = edge?.data?.to || edge?.target;
+    setEdgeEditor({ open: true, source: logicalFrom, target: logicalTo, type, label, x: e.clientX, y: e.clientY });
   }
   async function updateEdge(editor, newType, newLabel) {
     try {
