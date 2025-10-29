@@ -81,12 +81,12 @@ export default function MemberModal({
         aria-modal="true" 
         onClick={(e) => e.stopPropagation()}
         style={{ 
-          width: 'min(680px, 96vw)', 
+          width: 'min(560px, 94vw)', 
           background: '#ffffff', 
-          borderRadius: 16, 
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05)', 
+          borderRadius: 14, 
+          boxShadow: '0 16px 44px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.05)', 
           overflow: 'hidden',
-          animation: 'slideUp 0.3s ease-out'
+          animation: 'slideUp 0.25s ease-out'
         }}
       >
         {/* Header */}
@@ -94,24 +94,24 @@ export default function MemberModal({
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'space-between', 
-          padding: '20px 24px', 
+          padding: '14px 16px', 
           borderBottom: '2px solid #e5e7eb', 
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ 
-              width: 40, 
-              height: 40, 
-              borderRadius: 10, 
+              width: 32, 
+              height: 32, 
+              borderRadius: 8, 
               background: 'rgba(255, 255, 255, 0.2)', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
-              fontSize: 20
+              fontSize: 18
             }}>
               {isEdit ? '✏️' : '➕'}
             </div>
-            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#ffffff' }}>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#ffffff' }}>
               {isEdit ? 'Edit Member Details' : 'Add New Member'}
             </h3>
           </div>
@@ -119,13 +119,13 @@ export default function MemberModal({
             onClick={onClose} 
             title="Close dialog"
             style={{ 
-              padding: '8px 12px', 
-              borderRadius: 8, 
+              padding: '6px 10px', 
+              borderRadius: 6, 
               background: 'rgba(255, 255, 255, 0.2)', 
               color: '#ffffff', 
               border: 'none',
               cursor: 'pointer',
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: 600,
               transition: 'all 0.2s',
               display: 'flex',
@@ -140,12 +140,12 @@ export default function MemberModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: '24px', display: 'grid', gap: 18, background: '#f9fafb' }}>
+  <form onSubmit={handleSubmit} style={{ padding: '18px', display: 'grid', gap: 14, background: '#f9fafb' }}>
           {/* Top section: left photo panel, right details */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 260px) 1fr', gap: 18, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 220px) 1fr', gap: 14, alignItems: 'start' }}>
             {/* Left: Photo panel */}
             <div style={{ display: 'grid', gap: 10 }}>
-              <div style={{ position: 'relative', width: 128, height: 128 }}>
+              <div style={{ position: 'relative', width: 112, height: 112 }}>
                 <div
                   role="button"
                   tabIndex={0}
@@ -198,10 +198,10 @@ export default function MemberModal({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setPhotoEditOpen(true); }}
                       style={{
-                        padding: '8px 12px',
-                        fontSize: 13,
+                        padding: '6px 10px',
+                        fontSize: 12,
                         border: '2px solid #e5e7eb',
-                        borderRadius: 8,
+                        borderRadius: 6,
                         background: '#f3f4f6',
                         color: '#111827',
                         cursor: 'pointer',
@@ -242,13 +242,13 @@ export default function MemberModal({
 
               {/* Photo edit panel (URL + Upload) - toggled */}
               {photoEditOpen && (
-                <div style={{ display: 'grid', gap: 8, padding: 10, background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 10 }}>
+                <div style={{ display: 'grid', gap: 8, padding: 8, background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <strong style={{ fontSize: 12, color: '#374151' }}>{photo?.trim() ? 'Change Photo' : 'Add Photo'}</strong>
                     <button
                       type="button"
                       onClick={() => setPhotoEditOpen(false)}
-                      style={{ fontSize: 12, background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer' }}
+                      style={{ fontSize: 11, background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer' }}
                     >
                       ✕ Close
                     </button>
@@ -263,9 +263,9 @@ export default function MemberModal({
                       style={{
                         flex: 1,
                         minWidth: 160,
-                        padding: '10px 14px',
-                        height: '44px',
-                        fontSize: 14,
+                        padding: '8px 12px',
+                        height: '40px',
+                        fontSize: 13,
                         border: '2px solid #e5e7eb',
                         borderRadius: 8,
                         outline: 'none',
@@ -320,16 +320,16 @@ export default function MemberModal({
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       style={{
-                        padding: '9px 12px',
-                        fontSize: 14,
+                        padding: '7px 10px',
+                        fontSize: 13,
                         border: '2px solid #e5e7eb',
-                        borderRadius: 8,
+                        borderRadius: 6,
                         background: '#f3f4f6',
                         color: '#111827',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         whiteSpace: 'nowrap',
-                        height: '44px'
+                        height: '40px'
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e7eb'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
@@ -341,7 +341,7 @@ export default function MemberModal({
                     {uploading && <span style={{ alignSelf: 'center', fontSize: 12, color: '#1f6feb' }}>Uploading…</span>}
                     {uploadError && <span style={{ alignSelf: 'center', fontSize: 12, color: '#dc2626' }}>{uploadError}</span>}
                   </div>
-                  <span style={{ fontSize: 12, color: '#6b7280' }}>Tip: paste a https:// URL or use Upload Photo to create a /uploads/... path.</span>
+                  <span style={{ fontSize: 11, color: '#6b7280' }}>Tip: paste a https:// URL or use Upload Photo to create a /uploads/... path.</span>
                 </div>
               )}
 
@@ -406,9 +406,9 @@ export default function MemberModal({
             </div>
 
             {/* Right: Details panel */}
-            <div style={{ display: 'grid', gap: 12 }}>
+            <div style={{ display: 'grid', gap: 10 }}>
               <label style={{ display: 'grid', gap: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
                   Name <span style={{ color: '#dc2626' }}>*</span>
                 </span>
                 <input
@@ -418,8 +418,8 @@ export default function MemberModal({
                   placeholder="Enter full name"
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
-                    fontSize: 14,
+                    padding: '8px 12px',
+                    fontSize: 13,
                     border: '2px solid #e5e7eb',
                     borderRadius: 8,
                     outline: 'none',
@@ -434,9 +434,9 @@ export default function MemberModal({
                 />
               </label>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
                     📅 Date of Birth
                   </span>
                   <div
@@ -446,8 +446,8 @@ export default function MemberModal({
                       borderRadius: 8,
                       background: '#ffffff',
                       transition: 'all 0.2s',
-                      padding: '10px 14px',
-                      height: '44px',
+                      padding: '8px 12px',
+                      height: '40px',
                       boxSizing: 'border-box',
                       display: 'flex',
                       alignItems: 'center',
@@ -471,7 +471,7 @@ export default function MemberModal({
                         flex: 1,
                         padding: 0,
                         height: '100%',
-                        fontSize: 14,
+                        fontSize: 13,
                         border: 'none',
                         outline: 'none',
                         background: 'transparent',
@@ -495,7 +495,7 @@ export default function MemberModal({
                 </label>
 
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
                     📍 Location
                   </span>
                   <input
@@ -505,9 +505,9 @@ export default function MemberModal({
                     placeholder="City, Country"
                     style={{
                       width: '100%',
-                      padding: '10px 14px',
-                      height: '44px',
-                      fontSize: 14,
+                      padding: '8px 12px',
+                      height: '40px',
+                      fontSize: 13,
                       border: '2px solid #e5e7eb',
                       borderRadius: 8,
                       outline: 'none',
@@ -525,7 +525,7 @@ export default function MemberModal({
           </div>
 
           <label style={{ display: 'grid', gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
               📝 Notes
             </span>
             <textarea 
@@ -535,8 +535,8 @@ export default function MemberModal({
               placeholder="Add notes, occupation, interesting facts..."
               style={{ 
                 width: '100%', 
-                padding: '10px 14px', 
-                fontSize: 14, 
+                padding: '8px 12px', 
+                fontSize: 13, 
                 border: '2px solid #e5e7eb', 
                 borderRadius: 8,
                 outline: 'none',
@@ -557,26 +557,26 @@ export default function MemberModal({
             display: 'flex', 
             gap: 10, 
             flexWrap: 'wrap', 
-            marginTop: 8,
-            paddingTop: 18,
+            marginTop: 6,
+            paddingTop: 14,
             borderTop: '1px solid #e5e7eb'
           }}>
             <button 
               type="submit" 
               disabled={!canSave || !name.trim()} 
               style={{ 
-                padding: '11px 20px', 
-                borderRadius: 8, 
+                padding: '8px 12px', 
+                borderRadius: 6, 
                 background: (canSave && name.trim()) ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#94a3b8', 
                 color: '#fff', 
                 border: 'none', 
                 cursor: (canSave && name.trim()) ? 'pointer' : 'not-allowed',
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: 600,
-                boxShadow: (canSave && name.trim()) ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none',
+                boxShadow: (canSave && name.trim()) ? '0 2px 8px rgba(16, 185, 129, 0.25)' : 'none',
                 transition: 'all 0.2s',
                 flex: 1,
-                minWidth: 140
+                minWidth: 110
               }}
               onMouseEnter={(e) => {
                 if (canSave && name.trim()) {
@@ -597,15 +597,15 @@ export default function MemberModal({
                 type="button" 
                 onClick={() => onMoveToPool(member._id)} 
                 style={{ 
-                  padding: '11px 18px', 
-                  borderRadius: 8, 
+                  padding: '8px 12px', 
+                  borderRadius: 6, 
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
                   color: '#fff', 
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: 14,
+                  fontSize: 12,
                   fontWeight: 600,
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.25)',
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
@@ -626,15 +626,15 @@ export default function MemberModal({
                 type="button" 
                 onClick={() => onDelete(member._id)} 
                 style={{ 
-                  padding: '11px 18px', 
-                  borderRadius: 8, 
+                  padding: '8px 12px', 
+                  borderRadius: 6, 
                   background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
                   color: '#fff', 
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: 14,
+                  fontSize: 12,
                   fontWeight: 600,
-                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.25)',
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
@@ -654,13 +654,13 @@ export default function MemberModal({
               type="button" 
               onClick={onClose} 
               style={{ 
-                padding: '11px 18px', 
-                borderRadius: 8, 
+                padding: '8px 12px', 
+                borderRadius: 6, 
                 background: '#ffffff', 
                 color: '#374151', 
                 border: '2px solid #d1d5db',
                 cursor: 'pointer',
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: 600,
                 transition: 'all 0.2s'
               }}

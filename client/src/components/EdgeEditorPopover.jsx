@@ -34,17 +34,37 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
     };
   }, [onClose]);
 
-  const left = Math.max(8, Math.min(window.innerWidth - 280, x + 8));
-  const top = Math.max(8, Math.min(window.innerHeight - 200, y + 8));
+  // Responsive clamping so the popover never renders out of the viewport
+  const widthGuess = Math.min(320, Math.max(240, window.innerWidth - 16));
+  const heightGuess = 240; // slightly reduced default height
+  const left = Math.max(8, Math.min(window.innerWidth - (widthGuess + 8), x + 8));
+  const top = Math.max(8, Math.min(window.innerHeight - (heightGuess + 8), y + 8));
 
   return (
     <div style={{ position: 'fixed', left, top, zIndex: 2100 }}>
-      <div ref={ref} style={{ width: 260, background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 8, boxShadow: '0 8px 28px rgba(0,0,0,0.15)', padding: 12 }}>
-        <div style={{ fontWeight: 600, marginBottom: 8, color: '#111827' }}>Edit Relationship</div>
-        <div style={{ display: 'grid', gap: 8 }}>
-          <label style={{ fontSize: 12, color: '#334155' }}>
+      <div
+        ref={ref}
+        style={{
+          width: 'min(320px, calc(100vw - 16px))',
+          maxWidth: 'calc(100vw - 16px)',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 8,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+          padding: 10,
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ fontWeight: 600, marginBottom: 6, color: '#111827', fontSize: 13 }}>Edit Relationship</div>
+        <div style={{ display: 'grid', gap: 6 }}>
+          <label style={{ fontSize: 11, color: '#334155', display: 'block' }}>
             Type
-            <select value={localType} onChange={(e) => setLocalType(e.target.value)} style={{ width: '100%', marginTop: 4, padding: 6 }}>
+            <select
+              value={localType}
+              onChange={(e) => setLocalType(e.target.value)}
+              style={{ width: '100%', marginTop: 4, padding: 6, boxSizing: 'border-box', fontSize: 12 }}
+            >
               <option value="parent">parent</option>
               <option value="child">child</option>
               <option value="spouse">spouse</option>
@@ -52,14 +72,27 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
               <option value="custom">custom</option>
             </select>
           </label>
-          <label style={{ fontSize: 12, color: '#334155' }}>
+          <label style={{ fontSize: 11, color: '#334155', display: 'block' }}>
             Label (optional)
-            <input value={localLabel} onChange={(e) => setLocalLabel(e.target.value)} placeholder="e.g., guardian" style={{ width: '100%', marginTop: 4, padding: 6 }} />
+            <input
+              value={localLabel}
+              onChange={(e) => setLocalLabel(e.target.value)}
+              placeholder="e.g., guardian"
+              style={{
+                width: '100%',
+                marginTop: 4,
+                padding: 6,
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontSize: 12,
+              }}
+            />
           </label>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button onClick={() => onDelete?.()} style={{ padding: '6px 10px', borderRadius: 6, background: '#ef4444', color: '#fff', border: 'none' }}>Delete</button>
-            <button onClick={() => onUpdate?.(localType, localLabel)} style={{ padding: '6px 10px', borderRadius: 6, background: '#16a34a', color: '#fff', border: 'none' }}>Update</button>
-            <button onClick={() => onClose?.()} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111827', border: '1px solid #cbd5e1' }}>Cancel</button>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 4, flexWrap: 'wrap' }}>
+            <button onClick={() => onDelete?.()} style={{ padding: '5px 8px', borderRadius: 6, background: '#ef4444', color: '#fff', border: 'none', fontSize: 12 }}>Delete</button>
+            <button onClick={() => onUpdate?.(localType, localLabel)} style={{ padding: '5px 8px', borderRadius: 6, background: '#16a34a', color: '#fff', border: 'none', fontSize: 12 }}>Update</button>
+            <button onClick={() => onClose?.()} style={{ padding: '5px 8px', borderRadius: 6, background: '#e2e8f0', color: '#111827', border: '1px solid #cbd5e1', fontSize: 12 }}>Cancel</button>
           </div>
         </div>
       </div>

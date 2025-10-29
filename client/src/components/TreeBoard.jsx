@@ -175,13 +175,13 @@ export default function TreeBoard({
 
   useEffect(() => {
     if (maximized && rfInstance) {
-      // allow layout to settle then fit view
+      // Run fitView only once on entering fullscreen; do not re-run on node/edge selection changes
       const t = setTimeout(() => {
         try { rfInstance.fitView({ padding: 0.1 }); } catch (err) { /* ignore fit errors */ }
       }, 80);
       return () => clearTimeout(t);
     }
-  }, [maximized, rfInstance, nodes, edges]);
+  }, [maximized, rfInstance]);
 
   const containerStyle = maximized
     ? { position: 'fixed', inset: 0, background: '#ffffff', zIndex: 1100, display: 'flex', flexDirection: 'column' }
