@@ -412,6 +412,11 @@ function App() {
     return !!(perm && perm.access !== 'viewer');
   }, [currentUser, treeMeta]);
 
+  const isOwner = useMemo(() => {
+    if (!currentUser || !treeMeta) return false;
+    return String(treeMeta.owner) === String(currentUser._id);
+  }, [currentUser, treeMeta]);
+
   async function handleSaveMember(form) {
     if (!token) return alert('Please login first.');
     if (!treeId) return alert('Create a tree first.');
@@ -578,6 +583,30 @@ function App() {
     }
   }
 
+  // Delete the currently selected tree (owner-only). Cascade-deletes members.
+  async function handleDeleteTree() {
+    if (!treeId) return;
+    const title = treeMeta?.title || 'this tree';
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${title}"?\n\nThis will remove the tree and all its members. This action cannot be undone.`
+    );
+    if (!confirmed) return;
+    try {
+      await Trees.delete(treeId);
+      // Clear UI state
+      setTreeIdState('');
+      setTreeId('');
+      setNodes([]);
+      setEdges([]);
+      setMembers([]);
+      setTreeMeta(null);
+      await loadMyTrees();
+      showToast('Tree deleted');
+    } catch (e) {
+      showToast(`Delete failed: ${e.message}`);
+    }
+  }
+
   function svgDataUrlToPng(svgUrl, pixelRatio = 2) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -625,6 +654,9 @@ function App() {
                     <option key={t._id} value={t._id}>{t.title}</option>
                   ))}
                 </select>
+                {isOwner && treeId && (
+                  <button onClick={handleDeleteTree} title="Permanently delete this tree" style={{ padding: '6px 10px', borderRadius: 6, background: '#dc2626', color: '#fff', border: 'none' }}>Delete Tree</button>
+                )}
                 <button title="Refresh list" onClick={loadMyTrees} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1' }}>↻</button>
                 <button onClick={handleExportPng} disabled={!nodes.length} style={{ padding: '6px 10px', borderRadius: 6, background: nodes.length ? '#0ea5e9' : '#94a3b8', color: '#fff', border: 'none' }}>Export PNG</button>
                 <button onClick={handleLogout} style={{ padding: '6px 10px', borderRadius: 6, background: '#ef4444', color: '#fff', border: 'none' }}>Logout</button>

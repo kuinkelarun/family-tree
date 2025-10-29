@@ -49,6 +49,7 @@ export const Trees = {
   async create(title) { return api('/api/trees', { method: 'POST', body: { title } }); },
   async list() { return api('/api/trees'); },
   async get(id) { return api(`/api/trees/${id}`); },
+  async delete(id) { return api(`/api/trees/${id}`, { method: 'DELETE' }); },
 };
 
 export const Members = {

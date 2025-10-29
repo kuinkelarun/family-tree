@@ -40,3 +40,19 @@ export async function listMyTrees(req, res) {
     res.status(500).json({ error: e.message });
   }
 }
+
+export async function deleteTree(req, res) {
+  try {
+    const tree = await FamilyTree.findById(req.params.id);
+    if (!tree) return res.status(404).json({ error: 'Not found' });
+    // Only owner may delete an entire tree
+    if (!tree.owner.equals(req.user.id)) return res.status(403).json({ error: 'Forbidden' });
+
+    // Remove all members belonging to this tree, then delete the tree
+    await Member.deleteMany({ tree: tree._id });
+    await tree.deleteOne();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
