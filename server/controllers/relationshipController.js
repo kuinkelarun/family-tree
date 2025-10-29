@@ -85,7 +85,9 @@ export async function updateRelationship(req, res) {
 
 export async function deleteRelationship(req, res) {
   try {
-    const parsed = relationshipDeleteSchema.safeParse(req.body);
+    // Accept delete parameters in body (typical) or query string (some clients/proxies strip DELETE bodies)
+    const payload = (req.body && Object.keys(req.body).length) ? req.body : req.query;
+    const parsed = relationshipDeleteSchema.safeParse(payload);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     const { fromMemberId, toMemberId, type } = parsed.data;
     const from = await Member.findById(fromMemberId);

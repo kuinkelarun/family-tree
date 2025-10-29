@@ -589,7 +589,7 @@ export default function MemberModal({
                 e.currentTarget.style.boxShadow = (canSave && name.trim()) ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none';
               }}
             >
-              {isEdit ? '💾 Save Changes' : '➕ Add Member'}
+              {isEdit ? 'Save Changes' : 'Add Member'}
             </button>
 
             {isEdit && onMoveToPool && isOnCanvas && (
@@ -617,7 +617,7 @@ export default function MemberModal({
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
                 }}
               >
-                📦 Move to Pool
+                Move to Pool
               </button>
             )}
 
@@ -646,7 +646,7 @@ export default function MemberModal({
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
                 }}
               >
-                🗑️ Delete
+                Delete
               </button>
             )}
 

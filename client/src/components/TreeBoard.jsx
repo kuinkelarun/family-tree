@@ -98,6 +98,11 @@ export default function TreeBoard({
     // Normalize so we always end up with source(handle: *-source) -> target(handle: *-target)
     // but preserve whichever side handles the user picked (top/right/bottom/left)
     const params = normalizeConnection(rawParams);
+    // Prevent connecting a node to itself (different handles on same node)
+    if (params.source === params.target) {
+      setNotice('Cannot connect a node to itself');
+      return;
+    }
     if (onConnectExt) return onConnectExt(params);
     // Prevent duplicate edges (same source -> target)
     setEdges((eds) => {

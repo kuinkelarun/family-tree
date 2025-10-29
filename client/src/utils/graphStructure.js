@@ -109,12 +109,23 @@ function buildEnhancedEdges(members, graph) {
       const [parent1Id, parent2Id] = parents;
       
       // 1. Create spouse edge between parents (horizontal)
-      const spouseEdgeId = `spouse_${parent1Id}_${parent2Id}`;
+      // Ensure consistent visual direction: left-most node -> right-most node
+      const p1 = graph.nodes.get(parent1Id);
+      const p2 = graph.nodes.get(parent2Id);
+      let leftId = String(parent1Id);
+      let rightId = String(parent2Id);
+      if (p1 && p2) {
+        if ((p1.position?.x || 0) > (p2.position?.x || 0)) {
+          leftId = String(parent2Id);
+          rightId = String(parent1Id);
+        }
+      }
+      const spouseEdgeId = `spouse_${leftId}_${rightId}`;
       if (!createdEdges.has(spouseEdgeId)) {
         graph.edges.push({
           id: spouseEdgeId,
-          source: String(parent1Id),
-          target: String(parent2Id),
+          source: leftId,
+          target: rightId,
           type: 'smoothstep',
           data: { 
             type: 'spouse', 

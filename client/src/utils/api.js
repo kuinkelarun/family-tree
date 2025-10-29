@@ -68,7 +68,11 @@ export const Members = {
 export const Relationships = {
   async create(payload) { return api('/api/relationships', { method: 'POST', body: payload }); },
   async update(payload) { return api('/api/relationships', { method: 'PUT', body: payload }); },
-  async remove(payload) { return api('/api/relationships', { method: 'DELETE', body: payload }); },
+  async remove(payload) {
+    // Some environments (proxies / dev servers) drop DELETE bodies; include params in query string as a fallback.
+    const qs = `?fromMemberId=${encodeURIComponent(payload.fromMemberId)}&toMemberId=${encodeURIComponent(payload.toMemberId)}&type=${encodeURIComponent(payload.type)}`;
+    return api(`/api/relationships${qs}`, { method: 'DELETE' });
+  },
 };
 
 export const Users = {
