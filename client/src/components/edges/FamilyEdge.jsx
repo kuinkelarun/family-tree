@@ -1,0 +1,169 @@
+import React from 'react';
+import { getBezierPath, getSmoothStepPath, BaseEdge } from 'reactflow';
+
+/**
+ * Custom edge component supporting multiple rendering styles
+ * Handles parent-child, spouse, sibling, and virtual connector edges
+ */
+export default function FamilyEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  data = {},
+  markerEnd,
+  selected,
+}) {
+  const { type, label, virtual, renderStyle, fromMarriagePoint } = data;
+
+  // Choose rendering strategy based on edge type
+  let edgePath, labelX, labelY;
+
+  if (type === 'spouse' || renderStyle === 'horizontal') {
+    // Straight horizontal line for spouses
+    [edgePath, labelX, labelY] = getStraightPath(sourceX, sourceY, targetX, targetY);
+  } else if (renderStyle === 'orthogonal') {
+    // Right-angle connector for virtual marriage points
+    [edgePath, labelX, labelY] = getOrthogonalPath(sourceX, sourceY, targetX, targetY);
+  } else if (type === 'parent' && !fromMarriagePoint) {
+    // Smooth Bezier for single-parent connections
+    [edgePath, labelX, labelY] = getBezierPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      curvature: 0.25,
+    });
+  } else {
+    // Default smooth step for other connections
+    [edgePath, labelX, labelY] = getSmoothStepPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+    });
+  }
+
+  // Dynamic styling based on edge type
+  const edgeColor = getEdgeColor(type);
+  const edgeWidth = type === 'spouse' ? 3 : 2;
+  
+  const edgeStyle = {
+    ...style,
+    stroke: selected ? '#f59e0b' : edgeColor,
+    strokeWidth: selected ? edgeWidth + 1 : edgeWidth,
+    strokeDasharray: virtual ? '5,5' : 'none',
+    opacity: virtual ? 0.4 : 1,
+    transition: 'all 0.2s ease',
+  };
+
+  const markerEndStyle = markerEnd ? {
+    ...markerEnd,
+    color: selected ? '#f59e0b' : edgeColor,
+  } : undefined;
+
+  return (
+    <>
+      <BaseEdge 
+        id={id}
+        path={edgePath} 
+        markerEnd={markerEndStyle} 
+        style={edgeStyle} 
+      />
+      {label && !virtual && (
+        <EdgeLabel 
+          x={labelX} 
+          y={labelY} 
+          label={label}
+          color={edgeColor}
+          selected={selected}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Orthogonal path with two 90-degree turns
+ * Used for marriage point connectors
+ */
+function getOrthogonalPath(sx, sy, tx, ty) {
+  const midY = (sy + ty) / 2;
+  const path = `M ${sx},${sy} L ${sx},${midY} L ${tx},${midY} L ${tx},${ty}`;
+  const labelX = (sx + tx) / 2;
+  const labelY = midY;
+  return [path, labelX, labelY];
+}
+
+/**
+ * Straight line path
+ * Used for spouse connections
+ */
+function getStraightPath(sx, sy, tx, ty) {
+  const path = `M ${sx},${sy} L ${tx},${ty}`;
+  const labelX = (sx + tx) / 2;
+  const labelY = (sy + ty) / 2;
+  return [path, labelX, labelY];
+}
+
+/**
+ * Get color based on relationship type
+ */
+function getEdgeColor(type) {
+  const colors = {
+    parent: '#10b981',      // emerald-500 (green)
+    child: '#10b981',       // same as parent
+    spouse: '#ec4899',      // pink-500 (romantic)
+    sibling: '#3b82f6',     // blue-500 (sibling bond)
+    custom: '#8b5cf6',      // violet-500 (custom/other)
+    'parent-connector': '#94a3b8', // gray for virtual
+  };
+  return colors[type] || colors.custom;
+}
+
+/**
+ * Edge label component with background
+ */
+function EdgeLabel({ x, y, label, color, selected }) {
+  const labelPadding = 6;
+  const fontSize = 11;
+  
+  // Estimate text width (rough approximation)
+  const textWidth = label.length * (fontSize * 0.6);
+  const rectWidth = textWidth + labelPadding * 2;
+  const rectHeight = 18;
+
+  return (
+    <g transform={`translate(${x - rectWidth / 2}, ${y - rectHeight / 2})`}>
+      <rect
+        x={0}
+        y={0}
+        width={rectWidth}
+        height={rectHeight}
+        rx={4}
+        fill="white"
+        stroke={selected ? '#f59e0b' : color}
+        strokeWidth={selected ? 2 : 1}
+        opacity={0.95}
+      />
+      <text
+        x={rectWidth / 2}
+        y={rectHeight / 2 + 4}
+        textAnchor="middle"
+        fontSize={fontSize}
+        fontWeight={600}
+        fill="#111827"
+      >
+        {label}
+      </text>
+    </g>
+  );
+}

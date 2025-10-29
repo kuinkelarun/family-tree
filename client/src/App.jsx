@@ -191,9 +191,13 @@ function App() {
   // Configure arrow markers: arrow at the end (target)
   const markers = { markerEnd: { type: 'arrowclosed', color: edgeColor } };
 
+        // Generate edge ID that includes direction to prevent React Flow from reusing old edges
+        // Use source->target order (not sorted) so ID changes if direction changes
+        const edgeId = `${String(src)}-${String(dst)}-${type}`;
+
         const candidate = {
-          id: `${a}-${b}-${type}`,
-          // Display edge as TARGET -> SOURCE
+          id: edgeId,
+          // Display edge as SOURCE -> TARGET (arrow points to target)
           source: displaySourceId,
           target: displayTargetId,
           type: 'smoothstep',
@@ -211,12 +215,116 @@ function App() {
         };
 
         if (!current) {
-          pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, type });
+          // Store the edge metadata with actual source and target from the edge object
+          pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, type, src: String(src), dst: String(dst) });
         } else {
-          // Prefer the authored record (hasLabel). If both/no labels, prefer 'parent' over 'child'.
-          const preferThis = (!!r.label && !current.hasLabel) ||
-            (!current.hasLabel && !r.label && (type === 'parent' && current.type === 'child'));
-          if (preferThis) pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, type });
+          // Preference logic for which edge to keep:
+          // 1. For spouse/sibling: always prefer lexicographically smaller ID as source (consistent direction)
+          // 2. For parent/child: prefer the authored record (hasLabel), or prefer 'parent' over 'child'
+          // 3. For others: prefer the authored record (hasLabel)
+          
+          let preferThis = false;
+          
+          if (type === 'spouse' || type === 'sibling') {
+            // For symmetric relationships, always prefer edge where source < target alphabetically
+            // This ensures consistent visual direction regardless of who created the relationship
+            
+            // Get the two member IDs involved (regardless of which is source/target in this iteration)
+            const candidateSourceId = String(src);
+            const candidateTargetId = String(dst);
+            
+            // Determine the "correct" lexicographic direction (smaller ID should be source)
+            const candidateCorrectDirection = candidateSourceId < candidateTargetId;
+            const currentCorrectDirection = current.src < current.dst;
+            
+            // Debug logging for sibling relationships
+            if (type === 'sibling') {
+              console.log('[SIBLING] Deduplication check:', {
+                candidateSrc: candidateSourceId.substring(0, 8),
+                candidateDst: candidateTargetId.substring(0, 8),
+                candidateCorrect: candidateCorrectDirection,
+                candidateHasLabel: !!r.label,
+                currentSrc: current.src.substring(0, 8),
+                currentDst: current.dst.substring(0, 8),
+                currentCorrect: currentCorrectDirection,
+                currentHasLabel: current.hasLabel,
+              });
+            }
+            
+            // Priority logic for symmetric relationships:
+            // 1st priority: Has user-defined label (explicit user intention) - HIGHEST PRIORITY
+            // 2nd priority: Correct lexicographic direction (smaller ID as source) - for consistency
+            
+            const candidateHasLabel = !!r.label;
+            const currentHasLabel = current.hasLabel;
+            
+            // First, check if one has a label and the other doesn't
+            if (candidateHasLabel && !currentHasLabel) {
+              // Candidate has label (user's explicit choice), current doesn't → always prefer candidate
+              preferThis = true;
+            } else if (!candidateHasLabel && currentHasLabel) {
+              // Current has label (user's choice), candidate is reciprocal → keep current
+              preferThis = false;
+            } 
+            // If both have labels OR neither has labels, use lexicographic direction
+            else if (candidateCorrectDirection && !currentCorrectDirection) {
+              // Candidate has correct direction, current has wrong direction → replace
+              preferThis = true;
+            } else if (!candidateCorrectDirection && currentCorrectDirection) {
+              // Current has correct direction, candidate has wrong direction → keep current
+              preferThis = false;
+            } else {
+              // Both same: same label status AND same direction correctness → keep first one
+              preferThis = false;
+            }
+            
+            if (type === 'sibling') {
+              console.log('[SIBLING] Decision: preferThis =', preferThis);
+            }
+          } else if (type === 'parent' || type === 'child') {
+            // For parent/child, prefer the entry WITH A LABEL (user's intention)
+            // This ensures the relationship type the user selected is displayed
+            
+            // First priority: prefer the entry with a label (user's explicit choice)
+            if (!!r.label && !current.hasLabel) {
+              preferThis = true; // This entry has label, current doesn't
+            } else if (!r.label && current.hasLabel) {
+              preferThis = false; // Current has label, keep it
+            } 
+            // If both have labels OR both don't have labels, normalize to 'parent' type
+            else if (type === 'parent' && current.type === 'child') {
+              preferThis = true; // Prefer 'parent' over 'child' as tiebreaker
+            } else if (type === 'child' && current.type === 'parent') {
+              preferThis = false; // Keep 'parent' as tiebreaker
+            } else {
+              // Both same type and same label status (rare)
+              preferThis = false; // Keep first one
+            }
+          } else if (type === 'custom') {
+            // For custom relationships, use consistent direction like spouse/sibling
+            // This handles cases where users create bidirectional custom relationships
+            
+            const candidateSourceId = String(src);
+            const candidateTargetId = String(dst);
+            const candidateCorrectDirection = candidateSourceId < candidateTargetId;
+            const currentCorrectDirection = current.src < current.dst;
+            
+            if (!currentCorrectDirection && candidateCorrectDirection) {
+              preferThis = true;
+            } else if (currentCorrectDirection && !candidateCorrectDirection) {
+              preferThis = false;
+            } else {
+              preferThis = !!r.label && !current.hasLabel;
+            }
+          } else {
+            // Fallback for any other relationship types
+            preferThis = !!r.label && !current.hasLabel;
+          }
+          
+          if (preferThis) {
+            // Store the edge metadata with actual source and target from the edge object
+            pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, type, src: String(src), dst: String(dst) });
+          }
         }
       }
     }
