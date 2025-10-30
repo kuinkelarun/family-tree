@@ -15,7 +15,7 @@ const RELATIONSHIP_COLORS = {
   parent: '#10b981',    // emerald-500 (green) - parent to child
   child: '#10b981',     // emerald-500 (same as parent)
   spouse: '#ec4899',    // pink-500 (romantic)
-  sibling: '#3b82f6',   // blue-500 (sibling bond)
+  sibling: '#f97316',   // orange-500 (sibling bond)
   custom: '#8b5cf6',    // violet-500 (custom/other)
 };
 

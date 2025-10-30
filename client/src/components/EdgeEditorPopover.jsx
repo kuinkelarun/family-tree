@@ -11,11 +11,15 @@ import React, { useEffect, useRef, useState } from 'react';
 export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label = '', onUpdate, onDelete, onClose }) {
   const ref = useRef(null);
   const [localType, setLocalType] = useState(type);
-  const [localLabel, setLocalLabel] = useState(label);
+  const [localLabel, setLocalLabel] = useState(label || '');
+  const [labelEdited, setLabelEdited] = useState(Boolean(label));
 
   useEffect(() => {
+    // When incoming props change, update local state.
     setLocalType(type);
     setLocalLabel(label || '');
+    // If incoming label exists, treat it as user-edited; otherwise allow auto-labeling
+    setLabelEdited(Boolean(label));
   }, [type, label]);
 
   useEffect(() => {
@@ -26,13 +30,24 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
     function onKey(e) {
       if (e.key === 'Escape') onClose?.();
     }
-    document.addEventListener('mousedown', onDocClick);
+    // Use capture phase to detect clicks even if other handlers stop propagation
+    document.addEventListener('mousedown', onDocClick, true);
     window.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('mousedown', onDocClick, true);
       window.removeEventListener('keydown', onKey);
     };
   }, [onClose]);
+
+  // Auto-update label when type changes, unless the user has manually edited the label.
+  useEffect(() => {
+    // On type change, automatically update the label to match the type (empty for custom).
+    // This keeps the label in sync by default but the user can override by typing.
+    setLocalLabel(localType === 'custom' ? '' : localType);
+    setLabelEdited(false);
+    // do not include localLabel or labelEdited in deps to avoid loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localType]);
 
   // Responsive clamping so the popover never renders out of the viewport
   const widthGuess = Math.min(320, Math.max(240, window.innerWidth - 16));
@@ -76,7 +91,7 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
             Label (optional)
             <input
               value={localLabel}
-              onChange={(e) => setLocalLabel(e.target.value)}
+              onChange={(e) => { setLocalLabel(e.target.value); setLabelEdited(true); }}
               placeholder="e.g., guardian"
               style={{
                 width: '100%',

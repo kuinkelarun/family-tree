@@ -62,6 +62,11 @@ export default function TreeBoard({
   const [maximized, setMaximized] = useState(false);
   const [rfInstance, setRfInstance] = useState(null);
   const [notice, setNotice] = useState('');
+  // Group-drag state: when user holds Shift and drags a node, move all nodes together
+  const [groupDrag, setGroupDrag] = useState({ active: false, startX: 0, startY: 0, snapshot: [] });
+  const groupDragRef = React.useRef(groupDrag);
+  // keep ref in sync
+  useEffect(() => { groupDragRef.current = groupDrag; }, [groupDrag]);
 
   // Normalize any connection so that the final edge always points from a node's "source" handle to the other node's "target" handle.
   // This prevents flipped directions when users start dragging from a target handle by accident (e.g., right-side target dot).
@@ -123,6 +128,56 @@ export default function TreeBoard({
       return addEdge(forward, eds);
     });
   }, [setEdges, onConnectExt, nodes, normalizeConnection]);
+
+  // Handle multi-node move when user holds Shift while dragging a node
+  const onNodeDragStartLocal = useCallback((event, node) => {
+    try {
+      const isGroup = !!(event && event.shiftKey);
+      if (isGroup) {
+        const startX = event.clientX || 0;
+        const startY = event.clientY || 0;
+        const snapshot = (nodes || []).map((n) => ({ id: n.id, x: n.position?.x || 0, y: n.position?.y || 0 }));
+        const state = { active: true, startX, startY, snapshot };
+        setGroupDrag(state);
+        groupDragRef.current = state;
+        setNotice('Group drag: moving all nodes (release Shift to stop)');
+      }
+    } catch (err) {
+      // ignore
+    }
+  }, [nodes]);
+
+  const onNodeDragLocal = useCallback((event, node) => {
+    const g = groupDragRef.current;
+    if (!g || !g.active) return;
+    const dx = (event.clientX || 0) - g.startX;
+    const dy = (event.clientY || 0) - g.startY;
+    setNodes((nds) => nds.map((n) => {
+      const s = g.snapshot.find((x) => x.id === n.id);
+      if (!s) return n;
+      return { ...n, position: { x: s.x + dx, y: s.y + dy } };
+    }));
+  }, [setNodes]);
+
+  const onNodeDragStopLocal = useCallback((event, node) => {
+    const g = groupDragRef.current;
+    if (g && g.active) {
+      // Persist positions for all nodes via external handler if provided
+      if (onNodeDragStop) {
+        // call for each node currently in nodes
+        try {
+          nodes.forEach((n) => onNodeDragStop(n));
+        } catch (e) {
+          // ignore per-node errors
+        }
+      }
+      setGroupDrag({ active: false, startX: 0, startY: 0, snapshot: [] });
+      groupDragRef.current = { active: false, startX: 0, startY: 0, snapshot: [] };
+      setTimeout(() => setNotice(''), 500);
+      return;
+    }
+    if (onNodeDragStop) onNodeDragStop(node);
+  }, [nodes, onNodeDragStop]);
 
   // Allow updating an edge by dragging its handle to another node
   const onEdgeUpdate = useCallback((oldEdge, newConnectionRaw) => {
@@ -217,7 +272,7 @@ export default function TreeBoard({
             spouse
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 2, background: '#3b82f6', borderRadius: 1 }}></div>
+            <div style={{ width: 14, height: 2, background: '#f97316', borderRadius: 1 }}></div>
             sibling
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -242,7 +297,9 @@ export default function TreeBoard({
         connectionLineType="smoothstep"
         connectionMode="loose"
           onNodeClick={onNodeClick ? (_e, node) => onNodeClick(node?.id, node) : undefined}
-          onNodeDragStop={onNodeDragStop ? (e, node) => onNodeDragStop(node) : undefined}
+          onNodeDragStart={onNodeDragStartLocal}
+          onNodeDrag={onNodeDragLocal}
+          onNodeDragStop={onNodeDragStopLocal}
           onEdgeClick={onEdgeClick ? (e, edge) => onEdgeClick(e, edge) : undefined}
           onInit={setRfInstance}
           onDrop={onDrop}

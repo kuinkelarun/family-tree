@@ -72,7 +72,7 @@ export default function Sidebar({
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = '#f3f4f6';
-                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.borderColor = '#f97316';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = '#ffffff';
@@ -87,7 +87,7 @@ export default function Sidebar({
                         padding: '2px 8px',
                         fontSize: 11,
                         borderRadius: 4,
-                        background: '#3b82f6',
+                        background: '#f97316',
                         color: '#fff',
                         border: 'none',
                         cursor: 'pointer',
