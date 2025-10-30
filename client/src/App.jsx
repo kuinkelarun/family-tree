@@ -454,11 +454,12 @@ function App() {
       if (!confirmed) return;
       
       try {
-        await Members.delete(memberId);
+        // Close modal immediately to avoid it re-rendering into "Add New" briefly
+        setModalOpen(false);
         setSelectedId('');
+        await Members.delete(memberId);
         await loadTree(treeId);
         showToast(`${memberName} permanently deleted`);
-        setModalOpen(false);
       } catch (e) {
         showToast(`Delete failed: ${e.message}`);
       }
@@ -471,11 +472,12 @@ function App() {
       if (!confirmed) return;
       
       try {
-        await Members.update(memberId, { position: null });
+        // Close modal first to avoid flicker into "Add New Member" state
+        setModalOpen(false);
         setSelectedId('');
+        await Members.update(memberId, { position: null });
         await loadTree(treeId);
         showToast(`${memberName} moved to Member Pool`);
-        setModalOpen(false);
       } catch (e) {
         showToast(`Failed to remove from canvas: ${e.message}`);
       }
