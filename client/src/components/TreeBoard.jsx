@@ -37,6 +37,7 @@ export default function TreeBoard({
   setNodes: setNodesExt, 
   setEdges: setEdgesExt, 
   onAddPerson: onAddPersonExt, 
+  onAddPersonAt, // NEW: callback to add a person at a specific position (flow-space)
   onConnect: onConnectExt, 
   onNodeClick, 
   onNodeDragStop, 
@@ -66,6 +67,11 @@ export default function TreeBoard({
   const [alignGuides, setAlignGuides] = useState({ x: null, y: null });
   // Track viewport to convert flow-space guide coordinates to screen-space for overlay rendering
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+  const didInitialFitRef = React.useRef(false);
+  const didFullscreenFitRef = React.useRef(false);
+  // Tuning: show guides a bit earlier than we snap, for a smoother feel
+  const SNAP_THRESHOLD = 12;  // px distance at which we actually snap
+  const GUIDE_THRESHOLD = 18; // px distance at which we show a guide (can be > SNAP_THRESHOLD)
   // Group-drag state: when user holds Shift and drags a node, move all nodes together
   const [groupDrag, setGroupDrag] = useState({ active: false, startX: 0, startY: 0, snapshot: [] });
   const groupDragRef = React.useRef(groupDrag);
@@ -168,10 +174,10 @@ export default function TreeBoard({
     }
 
     // Soft alignment snapping for single-node drag
-    // Align to nearby nodes' left/center/right (x) and top/center/bottom (y) within threshold
+    // Align to nearby nodes' left/center/right (x) and top/center/bottom (y)
+    // Show guides when within GUIDE_THRESHOLD; snap when within SNAP_THRESHOLD
     try {
       if (!node?.id) return;
-      const threshold = 8; // px
       const curId = String(node.id);
       const curPos = node.position || { x: 0, y: 0 };
   let curW = Number.isFinite(node.width) ? node.width : undefined;
@@ -222,77 +228,93 @@ export default function TreeBoard({
         }
       });
 
-      // Find closest X snap
+      // Find closest X anchor
       let snapX = curLeft;
-      let bestDx = Infinity;
+      let bestDx = Infinity; // distance to closest anchor for snapping
       let bestAnchorX = null; // flow-space coordinate where we align (guide position)
       anchorsX.forEach((ax) => {
         // Try aligning our left -> ax
         const dxLeft = Math.abs(ax - curLeft);
-        if (dxLeft < bestDx && dxLeft <= threshold) {
+        if (dxLeft < bestDx) {
           bestDx = dxLeft;
-          snapX = ax; // left alignment
-          bestAnchorX = ax;
+          // Only compute snap target if within SNAP_THRESHOLD
+          if (dxLeft <= SNAP_THRESHOLD) {
+            snapX = ax; // left alignment
+          }
+          bestAnchorX = ax; // Always remember best anchor for guides
         }
         // Try aligning our center -> ax
         if (curCenterX != null && curW != null) {
           const dxCenter = Math.abs(ax - curCenterX);
-          if (dxCenter < bestDx && dxCenter <= threshold) {
+          if (dxCenter < bestDx) {
             bestDx = dxCenter;
-            snapX = ax - curW / 2; // center alignment
+            if (dxCenter <= SNAP_THRESHOLD) {
+              snapX = ax - curW / 2; // center alignment
+            }
             bestAnchorX = ax;
           }
         }
         // Try aligning our right -> ax
         if (curRight != null && curW != null) {
           const dxRight = Math.abs(ax - curRight);
-          if (dxRight < bestDx && dxRight <= threshold) {
+          if (dxRight < bestDx) {
             bestDx = dxRight;
-            snapX = ax - curW; // right alignment
+            if (dxRight <= SNAP_THRESHOLD) {
+              snapX = ax - curW; // right alignment
+            }
             bestAnchorX = ax;
           }
         }
       });
 
-      // Find closest Y snap
+      // Find closest Y anchor
       let snapY = curTop;
-      let bestDy = Infinity;
+      let bestDy = Infinity; // distance to closest anchor for snapping
       let bestAnchorY = null; // flow-space coordinate where we align (guide position)
       anchorsY.forEach((ay) => {
         // Align our top -> ay
         const dyTop = Math.abs(ay - curTop);
-        if (dyTop < bestDy && dyTop <= threshold) {
+        if (dyTop < bestDy) {
           bestDy = dyTop;
-          snapY = ay; // top alignment
+          if (dyTop <= SNAP_THRESHOLD) {
+            snapY = ay; // top alignment
+          }
           bestAnchorY = ay;
         }
         // Align our center -> ay
         if (curCenterY != null && curH != null) {
           const dyCenter = Math.abs(ay - curCenterY);
-          if (dyCenter < bestDy && dyCenter <= threshold) {
+          if (dyCenter < bestDy) {
             bestDy = dyCenter;
-            snapY = ay - curH / 2; // center alignment
+            if (dyCenter <= SNAP_THRESHOLD) {
+              snapY = ay - curH / 2; // center alignment
+            }
             bestAnchorY = ay;
           }
         }
         // Align our bottom -> ay
         if (curBottom != null && curH != null) {
           const dyBottom = Math.abs(ay - curBottom);
-          if (dyBottom < bestDy && dyBottom <= threshold) {
+          if (dyBottom < bestDy) {
             bestDy = dyBottom;
-            snapY = ay - curH; // bottom alignment
+            if (dyBottom <= SNAP_THRESHOLD) {
+              snapY = ay - curH; // bottom alignment
+            }
             bestAnchorY = ay;
           }
         }
       });
 
-      // Update only the dragged node position if a snap was found close enough
-      if (bestDx !== Infinity || bestDy !== Infinity) {
-        setNodes((nds) => nds.map((n) => (String(n.id) === curId ? { ...n, position: { x: snapX, y: snapY } } : n)));
-        setAlignGuides({ x: bestDx !== Infinity ? bestAnchorX : null, y: bestDy !== Infinity ? bestAnchorY : null });
-      } else {
-        // No close anchors -> clear guides
-        setAlignGuides({ x: null, y: null });
+      // Show guides when within guide threshold
+      const showXGuide = bestAnchorX != null && bestDx <= GUIDE_THRESHOLD;
+      const showYGuide = bestAnchorY != null && bestDy <= GUIDE_THRESHOLD;
+      setAlignGuides({ x: showXGuide ? bestAnchorX : null, y: showYGuide ? bestAnchorY : null });
+
+      // Snap only when within snap threshold on respective axis
+      const shouldSnapX = bestDx <= SNAP_THRESHOLD;
+      const shouldSnapY = bestDy <= SNAP_THRESHOLD;
+      if (shouldSnapX || shouldSnapY) {
+        setNodes((nds) => nds.map((n) => (String(n.id) === curId ? { ...n, position: { x: shouldSnapX ? snapX : curLeft, y: shouldSnapY ? snapY : curTop } } : n)));
       }
     } catch (err) {
       // Fail-safe: ignore snapping if any calculation fails
@@ -334,12 +356,78 @@ export default function TreeBoard({
     return () => clearTimeout(t);
   }, [notice]);
 
+  function computeSmartAddPosition() {
+    try {
+      const z = viewport?.zoom || 1;
+      const vx = viewport?.x || 0;
+      // Container size in pixels
+      const rect = exportRef?.current?.getBoundingClientRect?.();
+      const widthPx = rect?.width || 800;
+      const heightPx = rect?.height || 600;
+      // Visible flow-space bounds
+      const left = -vx / z;
+      const top = -(viewport?.y || 0) / z;
+      const right = left + widthPx / z;
+      const bottom = top + heightPx / z;
+      const cx = (left + right) / 2;
+      const cy = (top + bottom) / 2;
+
+      // Measured nodes (for collision)
+      const rfNodes = (rfInstance && typeof rfInstance.getNodes === 'function') ? rfInstance.getNodes() : nodes;
+      const existing = (rfNodes || []).map((n) => ({
+        x: (n.position?.x ?? 0),
+        y: (n.position?.y ?? 0),
+        w: Number.isFinite(n.width) ? n.width : 140,
+        h: Number.isFinite(n.height) ? n.height : 80,
+      }));
+      // New node assumed size (approx FamilyNode)
+      const NW = 140, NH = 80, MARGIN = 24;
+
+      function overlaps(x, y) {
+        const r = { x, y, w: NW, h: NH };
+        for (const e of existing) {
+          if (
+            r.x < e.x + e.w + MARGIN &&
+            r.x + r.w + MARGIN > e.x &&
+            r.y < e.y + e.h + MARGIN &&
+            r.y + r.h + MARGIN > e.y
+          ) return true;
+        }
+        return false;
+      }
+
+      // Spiral search around center within visible bounds
+      const maxRadius = Math.max(widthPx / z, heightPx / z);
+      const step = 40; // grid step in flow units
+      if (!overlaps(cx - NW / 2, cy - NH / 2)) return { x: cx - NW / 2, y: cy - NH / 2 };
+      for (let radius = step; radius <= maxRadius; radius += step) {
+        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 6) {
+          const x = cx + Math.cos(angle) * radius - NW / 2;
+          const y = cy + Math.sin(angle) * radius - NH / 2;
+          if (x < left || x + NW > right || y < top || y + NH > bottom) continue;
+          if (!overlaps(x, y)) return { x, y };
+        }
+      }
+      // Fallback: top-left of visible area with padding
+      return { x: left + 20, y: top + 20 };
+    } catch {
+      // ultimate fallback near origin
+      return { x: 60 + (nodes.length % 6) * 140, y: 60 + Math.floor(nodes.length / 6) * 120 };
+    }
+  }
+
   const addPerson = () => {
-    if (onAddPersonExt) return onAddPersonExt();
+    // Prefer external add-at-position if provided
+    if (typeof onAddPersonAt === 'function') {
+      const pos = computeSmartAddPosition();
+      return onAddPersonAt(pos);
+    }
+    // Backward-compat: call old handler if provided
+    if (typeof onAddPersonExt === 'function') return onAddPersonExt();
+    // Local demo mode
     const id = `new-${Date.now()}-${counter}`;
-    const x = 60 + (nodes.length % 6) * 140;
-    const y = 60 + Math.floor(nodes.length / 6) * 120;
-  setNodes((nds) => nds.concat({ id, position: { x, y }, data: { label: `Person ${counter}` }, type: 'familyNode' }));
+    const pos = computeSmartAddPosition();
+    setNodes((nds) => nds.concat({ id, position: pos, data: { label: `Person ${counter}` }, type: 'familyNode' }));
     setCounter((c) => c + 1);
   };
 
@@ -367,7 +455,7 @@ export default function TreeBoard({
   }, [rfInstance, onDropMember]);
 
   useEffect(() => {
-    if (!maximized) return;
+    if (maximized) return;
     const onKey = (e) => {
       if (e.key === 'Escape') setMaximized(false);
     };
@@ -377,11 +465,17 @@ export default function TreeBoard({
 
   useEffect(() => {
     if (maximized && rfInstance) {
-      // Run fitView only once on entering fullscreen; do not re-run on node/edge selection changes
-      const t = setTimeout(() => {
-        try { rfInstance.fitView({ padding: 0.1 }); } catch (err) { /* ignore fit errors */ }
-      }, 80);
-      return () => clearTimeout(t);
+      // Run fitView only once per fullscreen session
+      if (!didFullscreenFitRef.current) {
+        didFullscreenFitRef.current = true;
+        const t = setTimeout(() => {
+          try { rfInstance.fitView({ padding: 0.1 }); } catch (err) { /* ignore fit errors */ }
+        }, 80);
+        return () => clearTimeout(t);
+      }
+    } else {
+      // Reset flag when exiting fullscreen so next entry can fit once
+      didFullscreenFitRef.current = false;
     }
   }, [maximized, rfInstance]);
 
@@ -443,11 +537,23 @@ export default function TreeBoard({
           onNodeDrag={onNodeDragLocal}
           onNodeDragStop={onNodeDragStopLocal}
           onEdgeClick={onEdgeClick ? (e, edge) => onEdgeClick(e, edge) : undefined}
-          onInit={(inst) => { setRfInstance(inst); try { const vp = inst?.getViewport?.(); if (vp) setViewport(vp); } catch {} }}
+          onInit={(inst) => {
+            setRfInstance(inst);
+            try {
+              const vp = inst?.getViewport?.();
+              if (vp) setViewport(vp);
+              // Do an initial fit once (not on updates) to avoid tiny shifts later
+              if (!didInitialFitRef.current) {
+                didInitialFitRef.current = true;
+                setTimeout(() => {
+                  try { inst.fitView?.({ padding: 0.1 }); } catch {}
+                }, 0);
+              }
+            } catch {}
+          }}
           onDrop={onDrop}
           onDragOver={onDragOver}
           onMove={(_evt, vp) => { try { if (vp) setViewport(vp); } catch {} }}
-        fitView
         proOptions={{ hideAttribution: true }}
       >
         <MiniMap pannable zoomable />

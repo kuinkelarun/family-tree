@@ -324,14 +324,15 @@ function App() {
   }
 
   // CANVAS WORKFLOW: Add a basic visual node (not creating a member in DB)
-  async function handleAddPerson() {
+  async function handleAddPersonAt(position) {
     if (!treeId) return alert('Create a tree first.');
     try {
       const idx = nodes.length;
       const name = `Person ${idx + 1}`;
-      const position = fallbackPosForIndex(idx);
-      // Create member with basic info, will appear on canvas
-      await Members.create({ tree: treeId, name, position });
+      const pos = position && typeof position.x === 'number' && typeof position.y === 'number'
+        ? position
+        : fallbackPosForIndex(idx);
+      await Members.create({ tree: treeId, name, position: pos });
       await loadTree(treeId);
     } catch (e) {
       showToast(`Add node failed: ${e.message}`);
@@ -678,7 +679,7 @@ function App() {
           edges={edges}
           setNodes={setNodes}
           setEdges={setEdges}
-          onAddPerson={isAuthed && treeId && canEdit ? handleAddPerson : undefined}
+          onAddPersonAt={isAuthed && treeId && canEdit ? handleAddPersonAt : undefined}
           canAdd={!!(isAuthed && treeId && canEdit)}
           onConnect={isAuthed && canEdit ? handleConnectEdge : undefined}
           onNodeClick={handleSelectNode}
