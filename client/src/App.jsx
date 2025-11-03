@@ -181,9 +181,28 @@ function App() {
           id: `e-${p2Id}-${marriagePointId}`,
           source: p2Id,
           target: marriagePointId,
+          sourceHandle: 'bottom-source',
           targetHandle: 'top-target',
           type: 'smoothstep',
           style: { stroke: '#ccc', strokeWidth: 1.5 },
+        });
+
+        // Also add the spouse edge between the parents
+        const dx = p2Pos.x - p1Pos.x;
+        const isP2Right = dx >= 0;
+        allEdges.push({
+          id: `e-${pairKey}-spouse`,
+          source: p1Id,
+          target: p2Id,
+          type: 'smoothstep',
+          label: 'spouse',
+          sourceHandle: isP2Right ? 'right-source' : 'left-source',
+          targetHandle: isP2Right ? 'left-target' : 'right-target',
+          labelStyle: { fill: '#111827', fontSize: 12, fontWeight: 600 },
+          labelBgStyle: { fill: '#ffffff', fillOpacity: 0.95, stroke: RELATIONSHIP_COLORS.spouse, strokeWidth: 1 },
+          labelBgPadding: [3, 4],
+          labelBgBorderRadius: 4,
+          style: { stroke: RELATIONSHIP_COLORS.spouse, strokeWidth: 2 },
         });
 
         // Edges from marriage point to children

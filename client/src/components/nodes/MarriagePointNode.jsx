@@ -20,6 +20,7 @@ export default function MarriagePointNode({ data, selected }) {
       <Handle 
         type="target" 
         position={Position.Top} 
+        id="top-target"
         style={{ 
           background: '#94a3b8',
           border: '2px solid white',
