@@ -163,7 +163,9 @@ function App() {
           type: 'marriagePoint',
           position: marriagePointPos,
           data: { label: 'Marriage Point' },
-          draggable: false,
+          // allow dragging the marriage point in the canvas (visual only)
+          draggable: true,
+          // keep unselectable to avoid editing modal; selection is handled only for familyNode
           selectable: false,
         });
 
@@ -623,6 +625,14 @@ function App() {
       if (!node?.id) return;
       const { x, y } = node.position || {};
       if (typeof x !== 'number' || typeof y !== 'number') return;
+      // If it's a marriagePoint (virtual helper node), only update UI state — do not persist to server
+      if (node.type === 'marriagePoint') {
+        console.log(`[handleNodeDragStop] Updating marriage point position locally for ${node.id}:`, { x, y });
+        setNodes((nds) => nds.map((n) => (String(n.id) === String(node.id) ? { ...n, position: { x, y } } : n)));
+        return;
+      }
+
+      // For real member nodes, persist position to backend
       console.log(`[handleNodeDragStop] Saving position for ${node.id}:`, { x, y });
       await Members.update(node.id, { position: { x, y } });
       console.log(`[handleNodeDragStop] Position saved successfully`);
