@@ -31,6 +31,7 @@ export default function MarriagePointNode({ data, selected }) {
       <Handle 
         type="source" 
         position={Position.Bottom}
+        id="bottom-source"
         style={{ 
           background: '#94a3b8',
           border: '2px solid white',
@@ -47,9 +48,7 @@ export default function MarriagePointNode({ data, selected }) {
           borderRadius: '50%',
           background: verified ? '#10b981' : '#94a3b8',
           border: `2px solid ${selected ? '#f59e0b' : 'white'}`,
-          boxShadow: selected 
-            ? '0 0 0 3px rgba(245, 158, 11, 0.3)' 
-            : '0 2px 8px rgba(0,0,0,0.15)',
+          boxShadow: selected ? '0 0 0 3px rgba(245, 158, 11, 0.3)' : '0 2px 8px rgba(0,0,0,0.15)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -57,39 +56,11 @@ export default function MarriagePointNode({ data, selected }) {
           cursor: 'default',
           transition: 'all 0.2s ease',
         }}
-        title={`Family Unit Connector${verified ? ' (Verified)' : ''}`}
       >
         <span style={{ opacity: 0.8 }}>
-          {label || '⚭'}
+          {'⚭'}
         </span>
       </div>
-
-      {/* Hover tooltip */}
-      {selected && (
-        <div
-          style={{
-            position: 'absolute',
-            top: -40,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: '#111827',
-            color: 'white',
-            padding: '4px 8px',
-            borderRadius: 4,
-            fontSize: 10,
-            whiteSpace: 'nowrap',
-            pointerEvents: 'none',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-          }}
-        >
-          Marriage Point
-          {parents.length === 2 && (
-            <div style={{ fontSize: 9, opacity: 0.7 }}>
-              {parents.length} parents
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

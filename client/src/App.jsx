@@ -167,7 +167,7 @@ function App() {
           selectable: false,
         });
 
-        // Edges from parents to marriage point
+        // Edges from parents to marriage point (styled like child edges)
         allEdges.push({
           id: `e-${p1Id}-${marriagePointId}`,
           source: p1Id,
@@ -175,7 +175,9 @@ function App() {
           sourceHandle: 'bottom-source',
           targetHandle: 'top-target',
           type: 'smoothstep',
-          style: { stroke: '#ccc', strokeWidth: 1.5 },
+          style: { stroke: RELATIONSHIP_COLORS.child, strokeWidth: 2 },
+          markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.child },
+          data: { bundle: false, type: 'child' },
         });
         allEdges.push({
           id: `e-${p2Id}-${marriagePointId}`,
@@ -184,7 +186,9 @@ function App() {
           sourceHandle: 'bottom-source',
           targetHandle: 'top-target',
           type: 'smoothstep',
-          style: { stroke: '#ccc', strokeWidth: 1.5 },
+          style: { stroke: RELATIONSHIP_COLORS.child, strokeWidth: 2 },
+          markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.child },
+          data: { bundle: false, type: 'child' },
         });
 
         // Also add the spouse edge between the parents
@@ -348,13 +352,26 @@ function App() {
   // This is a non-destructive visual bundling: underlying relationships are preserved.
   function bundleEdges(edgesIn, nodesIn) {
     try {
-      if (!Array.isArray(edgesIn) || !edgesIn.length) return edgesIn;
+      if (!Array.isArray(edgesIn) || !edgesIn.length) return [];
+      
       const pos = new Map(nodesIn.map(nd => [String(nd.id), nd.position || { x: 0, y: 0 }]));
-      const groups = new Map(); // key -> array of {edge, midX, midY, orient}
+      const groups = new Map();
+      const output = [];
 
       function quant(v, q = 20) { return Math.round((v || 0) / q) * q; }
 
+      // First, separate edges that should not be bundled
+      const edgesToBundle = [];
       for (const edge of edgesIn) {
+        if (edge.data?.bundle === false) {
+          output.push(edge); // Add directly to output
+        } else {
+          edgesToBundle.push(edge);
+        }
+      }
+
+      // Group the remaining edges
+      for (const edge of edgesToBundle) {
         const type = edge?.data?.type || edge?.label || 'custom';
         const sp = pos.get(String(edge.source)) || { x: 0, y: 0 };
         const tp = pos.get(String(edge.target)) || { x: 0, y: 0 };
@@ -366,34 +383,34 @@ function App() {
         const key = orient === 'vertical'
           ? `${type}|${orient}|x=${quant(midX, 24)}`
           : `${type}|${orient}|y=${quant(midY, 24)}`;
+        
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push({ edge, midX, midY, orient });
       }
 
-      const out = [];
+      // Process the groups
       for (const [, arr] of groups) {
         if (arr.length <= 1) {
-          out.push(arr[0].edge);
+          output.push(arr[0].edge);
           continue;
         }
-        // Choose a primary to keep label (use median by mid along the orthogonal axis for stability)
+        
         const sorted = [...arr].sort((a, b) => (a.orient === 'vertical' ? a.midY - b.midY : a.midX - b.midX));
         const primary = sorted[Math.floor(sorted.length / 2)].edge;
+        
         for (const { edge } of arr) {
           if (edge === primary) {
-            // Keep label as-is; mark the bundle id for future advanced bundling
-            out.push({ ...edge, data: { ...edge.data, bundlePrimary: true } });
+            output.push({ ...edge, data: { ...edge.data, bundlePrimary: true } });
           } else {
-            // Hide duplicate labels; reduce visual weight to hint bundling
-            const style = { ...(edge.style || {}), opacity: 0.45 };
-            out.push({ ...edge, label: '', style, data: { ...edge.data, bundleMember: true } });
+            // No longer applying a faded style, just removing the label
+            output.push({ ...edge, label: '', data: { ...edge.data, bundleMember: true } });
           }
         }
       }
-      return out;
+      
+      return output;
     } catch (e) {
-      // On any error, return original edges unchanged
-      return edgesIn;
+      return edgesIn; // Fallback on error
     }
   }
 
@@ -502,9 +519,19 @@ function App() {
     setPreviewEdge(null);
   }
 
-  function handleSelectNode(id) {
-    setSelectedId(String(id || ''));
-    if (id) setModalOpen(true);
+  function handleSelectNode(id, node) {
+    // Only open the member modal for actual family member nodes
+    const nodeType = node?.type || '';
+    if (!id) {
+      setSelectedId('');
+      return;
+    }
+    if (nodeType !== 'familyNode') {
+      // ignore clicks on marriagePoint or other helper nodes
+      return;
+    }
+    setSelectedId(String(id));
+    setModalOpen(true);
   }
 
   function selectedMember() {
