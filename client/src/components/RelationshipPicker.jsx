@@ -1,19 +1,31 @@
 import React, { useEffect, useState } from 'react';
 
-export default function RelationshipPicker({ open, onCancel, onConfirm, onDelete, defaultType = 'custom', defaultLabel = '' }) {
+export default function RelationshipPicker({
+  open,
+  fromName = '...',
+  toName = '...',
+  onCancel,
+  onConfirm,
+  onDelete,
+  defaultType = 'custom',
+  defaultLabel = '',
+}) {
   const [type, setType] = useState(defaultType);
   const [label, setLabel] = useState(defaultLabel);
+
   useEffect(() => {
     if (!open) return; // don't register when closed
     const onKey = (e) => { if (e.key === 'Escape') onCancel?.(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel, open]);
+
   if (!open) return null;
+
   return (
     <div onClick={() => onCancel?.()} style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#ffffff', color: '#111827', borderRadius: 10, padding: 16, width: 340, boxShadow: '0 8px 24px rgba(0,0,0,0.25)', border: '1px solid #e5e7eb' }} role="dialog" aria-modal="true">
-        <h3 style={{ margin: '0 0 10px 0' }}>{onDelete ? 'Edit relationship' : 'Select relationship'}</h3>
+        <h3 style={{ margin: '0 0 10px 0' }}>{onDelete ? 'Edit relationship' : 'Create relationship'}</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <select value={type} onChange={(e) => setType(e.target.value)} style={{ padding: 8 }}>
             <option value="parent">parent</option>

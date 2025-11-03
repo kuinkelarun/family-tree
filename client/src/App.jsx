@@ -138,8 +138,9 @@ function App() {
         const sortedKey = a < b ? `${a}|${b}` : `${b}|${a}`;
         const current = pairMap.get(sortedKey);
 
-        const type = r.type || 'custom';
-        const label = r.label || type;
+  const type = r.type || 'custom';
+  const label = r.label || type;
+  const authored = !!r.authored;
         const edgeColor = RELATIONSHIP_COLORS[type] || RELATIONSHIP_COLORS.custom;
         
   // Display rule: always render edge as SOURCE -> TARGET (arrow points to target)
@@ -211,12 +212,12 @@ function App() {
           style: { stroke: edgeColor, strokeWidth: 2 },
           ...markers,
           // Keep original logical direction for editing APIs
-          data: { type, label, from: String(src), to: String(dst) },
+          data: { type, label, authored, from: String(src), to: String(dst) },
         };
 
         if (!current) {
           // Store the edge metadata with actual source and target from the edge object
-          pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, type, src: String(src), dst: String(dst) });
+          pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, authored, type, src: String(src), dst: String(dst) });
         } else {
           // Preference logic for which edge to keep:
           // 1. For spouse/sibling: always prefer lexicographically smaller ID as source (consistent direction)
@@ -227,14 +228,19 @@ function App() {
           // Debug info to help track direction decisions
           const debugInfo = {
             key: sortedKey,
-            candidate: { src: String(src), dst: String(dst), type, hasLabel: !!r.label },
-            current: { src: current.src, dst: current.dst, type: current.type, hasLabel: current.hasLabel },
+            candidate: { src: String(src), dst: String(dst), type, hasLabel: !!r.label, authored },
+            current: { src: current.src, dst: current.dst, type: current.type, hasLabel: current.hasLabel, authored: current.authored },
           };
           
           if (type === 'parent' || type === 'child') {
             // For parent/child, prefer the entry WITH A LABEL (user's intention)
             // This ensures the relationship type the user selected is displayed
-            
+            // First priority: prefer the entry that was authored at creation time
+            if (authored && !current.authored) {
+              preferThis = true;
+            } else if (!authored && current.authored) {
+              preferThis = false;
+            } else {
             // First priority: prefer the entry with a label (user's explicit choice)
             if (!!r.label && !current.hasLabel) {
               preferThis = true; // This entry has label, current doesn't
@@ -250,12 +256,17 @@ function App() {
               // Both same type and same label status (rare)
               preferThis = false; // Keep first one
             }
+            }
           } else if (type === 'sibling' || type === 'spouse') {
             // For symmetric relationships (spouse/sibling): prefer the explicitly authored entry (has label).
             // If neither side has a label, keep the first-seen direction to remain deterministic.
             const candidateHasLabel = !!r.label;
             const currentHasLabel = current.hasLabel;
-            if (candidateHasLabel && !currentHasLabel) {
+            if (authored && !current.authored) {
+              preferThis = true;
+            } else if (!authored && current.authored) {
+              preferThis = false;
+            } else if (candidateHasLabel && !currentHasLabel) {
               preferThis = true;
             } else if (!candidateHasLabel && currentHasLabel) {
               preferThis = false;
@@ -277,17 +288,17 @@ function App() {
             } else if (currentCorrectDirection && !candidateCorrectDirection) {
               preferThis = false;
             } else {
-              preferThis = !!r.label && !current.hasLabel;
+              preferThis = (authored && !current.authored) || (!!r.label && !current.hasLabel);
             }
           } else {
             // Fallback for any other relationship types
-            preferThis = !!r.label && !current.hasLabel;
+            preferThis = (authored && !current.authored) || (!!r.label && !current.hasLabel);
           }
           
           if (preferThis) {
             console.debug('[mapTreeToGraph] Replacing edge for', debugInfo.key, 'decision=preferThis', debugInfo);
             // Store the edge metadata with actual source and target from the edge object
-            pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, type, src: String(src), dst: String(dst) });
+            pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, authored, type, src: String(src), dst: String(dst) });
           }
           else {
             console.debug('[mapTreeToGraph] Keeping existing edge for', debugInfo.key, 'decision=keepCurrent', debugInfo);
@@ -295,8 +306,64 @@ function App() {
         }
       }
     }
-    const e = Array.from(pairMap.values()).map((v) => v.edge);
+    const rawEdges = Array.from(pairMap.values()).map((v) => v.edge);
+
+    // Bundle overlapping/parallel edges by type and axis; keep one label per bundle
+    const e = bundleEdges(rawEdges, n);
     return { n, e, members };
+  }
+
+  // Group edges that likely overlap (same type and orientation) and hide duplicate labels.
+  // This is a non-destructive visual bundling: underlying relationships are preserved.
+  function bundleEdges(edgesIn, nodesIn) {
+    try {
+      if (!Array.isArray(edgesIn) || !edgesIn.length) return edgesIn;
+      const pos = new Map(nodesIn.map(nd => [String(nd.id), nd.position || { x: 0, y: 0 }]));
+      const groups = new Map(); // key -> array of {edge, midX, midY, orient}
+
+      function quant(v, q = 20) { return Math.round((v || 0) / q) * q; }
+
+      for (const edge of edgesIn) {
+        const type = edge?.data?.type || edge?.label || 'custom';
+        const sp = pos.get(String(edge.source)) || { x: 0, y: 0 };
+        const tp = pos.get(String(edge.target)) || { x: 0, y: 0 };
+        const dx = (tp.x || 0) - (sp.x || 0);
+        const dy = (tp.y || 0) - (sp.y || 0);
+        const orient = Math.abs(dy) >= Math.abs(dx) ? 'vertical' : 'horizontal';
+        const midX = (sp.x + tp.x) / 2;
+        const midY = (sp.y + tp.y) / 2;
+        const key = orient === 'vertical'
+          ? `${type}|${orient}|x=${quant(midX, 24)}`
+          : `${type}|${orient}|y=${quant(midY, 24)}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({ edge, midX, midY, orient });
+      }
+
+      const out = [];
+      for (const [, arr] of groups) {
+        if (arr.length <= 1) {
+          out.push(arr[0].edge);
+          continue;
+        }
+        // Choose a primary to keep label (use median by mid along the orthogonal axis for stability)
+        const sorted = [...arr].sort((a, b) => (a.orient === 'vertical' ? a.midY - b.midY : a.midX - b.midX));
+        const primary = sorted[Math.floor(sorted.length / 2)].edge;
+        for (const { edge } of arr) {
+          if (edge === primary) {
+            // Keep label as-is; mark the bundle id for future advanced bundling
+            out.push({ ...edge, data: { ...edge.data, bundlePrimary: true } });
+          } else {
+            // Hide duplicate labels; reduce visual weight to hint bundling
+            const style = { ...(edge.style || {}), opacity: 0.45 };
+            out.push({ ...edge, label: '', style, data: { ...edge.data, bundleMember: true } });
+          }
+        }
+      }
+      return out;
+    } catch (e) {
+      // On any error, return original edges unchanged
+      return edgesIn;
+    }
   }
 
   async function loadTree(id) {
@@ -368,8 +435,9 @@ function App() {
     }
   }
 
-  const [relPicker, setRelPicker] = useState({ open: false, source: '', target: '' });
+  const [relPicker, setRelPicker] = useState({ open: false, source: '', target: '', sourceHandle: '', targetHandle: '' });
   const [modalOpen, setModalOpen] = useState(false);
+  const [previewEdge, setPreviewEdge] = useState(null);
 
   // Debug: log when modal state changes to verify wiring in the UI
   useEffect(() => {
@@ -379,14 +447,19 @@ function App() {
 
   function handleConnectEdge(params) {
     if (!treeId) return;
-    setRelPicker({ open: true, source: params.source, target: params.target });
+    console.log(`[handleConnectEdge] Opening picker for connection: ${params.source} (${params.sourceHandle}) -> ${params.target} (${params.targetHandle})`);
+    setRelPicker({ open: true, source: params.source, target: params.target, sourceHandle: params.sourceHandle, targetHandle: params.targetHandle });
   }
 
   async function confirmRelationship(type, label) {
     try {
+      console.log(`[confirmRelationship] Creating: ${relPicker.source} -> ${relPicker.target}, type=${type}, label=${label}`);
+      // Remove any preview once we commit (we'll show the real edge after reload)
+      // Keeping the preview until after loadTree would avoid any single-frame overlap, but both are acceptable.
       await Relationships.create({ fromMemberId: relPicker.source, toMemberId: relPicker.target, type, label });
-      setRelPicker({ open: false, source: '', target: '' });
+      setRelPicker({ open: false, source: '', target: '', sourceHandle: '', targetHandle: '' });
       await loadTree(treeId);
+      setPreviewEdge(null);
       showToast('Relationship added');
     } catch (e) {
       showToast(`Add relationship failed: ${e.message}`);
@@ -394,7 +467,8 @@ function App() {
   }
 
   function cancelRelationship() {
-    setRelPicker({ open: false, source: '', target: '' });
+    setRelPicker({ open: false, source: '', target: '', sourceHandle: '', targetHandle: '' });
+    setPreviewEdge(null);
   }
 
   function handleSelectNode(id) {
@@ -676,7 +750,7 @@ function App() {
         </header>
         <TreeBoard
           nodes={nodes}
-          edges={edges}
+          edges={previewEdge ? [...edges, previewEdge] : edges}
           setNodes={setNodes}
           setEdges={setEdges}
           onAddPersonAt={isAuthed && treeId && canEdit ? handleAddPersonAt : undefined}
@@ -693,6 +767,51 @@ function App() {
             open={relPicker.open}
             onCancel={cancelRelationship}
             onConfirm={confirmRelationship}
+            onTypePreview={(t) => {
+              try {
+                if (!relPicker.source || !relPicker.target) return;
+                const from = String(relPicker.source);
+                const to = String(relPicker.target);
+                // Apply strict handle rules
+                let sourceHandle, targetHandle;
+                if (t === 'parent') {
+                  sourceHandle = 'top-source';
+                  targetHandle = 'bottom-target';
+                } else if (t === 'child') {
+                  sourceHandle = 'bottom-source';
+                  targetHandle = 'top-target';
+                } else {
+                  // For horizontal types, choose left/right based on current positions if available
+                  const a = nodes.find(n => String(n.id) === from)?.position || { x: 0, y: 0 };
+                  const b = nodes.find(n => String(n.id) === to)?.position || { x: 0, y: 0 };
+                  const right = (b.x - a.x) >= 0;
+                  sourceHandle = `${right ? 'right' : 'left'}-source`;
+                  targetHandle = `${right ? 'left' : 'right'}-target`;
+                }
+                // Edge color per type
+                const colorMap = {
+                  parent: '#10b981',
+                  child: '#10b981',
+                  spouse: '#ec4899',
+                  sibling: '#f97316',
+                  custom: '#8b5cf6',
+                };
+                const edgeColor = colorMap[t] || colorMap.custom;
+                const id = `preview-${from}-${to}`;
+                setPreviewEdge({
+                  id,
+                  source: from,
+                  target: to,
+                  type: 'smoothstep',
+                  label: t !== 'custom' ? t : '',
+                  sourceHandle,
+                  targetHandle,
+                  style: { stroke: edgeColor, strokeWidth: 2, opacity: 0.8, strokeDasharray: '4,4' },
+                  markerEnd: { type: 'arrowclosed', color: edgeColor },
+                  data: { type: t, label: t !== 'custom' ? t : '', from, to, preview: true },
+                });
+              } catch {}
+            }}
           />
         )}
         {edgeEditor.open && (

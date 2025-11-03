@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -75,38 +75,57 @@ export default function TreeBoard({
   // Group-drag state: when user holds Shift and drags a node, move all nodes together
   const [groupDrag, setGroupDrag] = useState({ active: false, startX: 0, startY: 0, snapshot: [] });
   const groupDragRef = React.useRef(groupDrag);
+  const connectStartRef = useRef(null);
   // keep ref in sync
   useEffect(() => { groupDragRef.current = groupDrag; }, [groupDrag]);
 
+  const onConnectStart = useCallback((_, { nodeId, handleId, handleType }) => {
+    connectStartRef.current = { nodeId, handleId, handleType };
+  }, []);
+
+  const onConnectEnd = useCallback(() => {
+    connectStartRef.current = null;
+  }, []);
+
   // Normalize any connection so that the final edge always points from a node's "source" handle to the other node's "target" handle.
   // This prevents flipped directions when users start dragging from a target handle by accident (e.g., right-side target dot).
-  const normalizeConnection = useCallback((p) => {
-    const sh = String(p.sourceHandle || '');
-    const th = String(p.targetHandle || '');
-    const sourceIsSource = sh.includes('source');
-    const targetIsTarget = th.includes('target');
-    if (sourceIsSource && targetIsTarget) return p; // already correct
+  // Preserve user intent: always keep direction from the node where drag started (source) to the node where it ended (target).
+  const normalizeConnection = useCallback((connection) => {
+    const start = connectStartRef.current;
+    if (!start) return connection;
 
-    const sourceIsTarget = sh.includes('target');
-    const targetIsSource = th.includes('source');
-    if (sourceIsTarget && targetIsSource) {
-      // fully reversed -> swap ends
-      return {
-        ...p,
-        source: p.target,
-        target: p.source,
-        sourceHandle: p.targetHandle,
-        targetHandle: p.sourceHandle,
+    const { nodeId: startNodeId, handleId: startHandleId } = start;
+    const { source, sourceHandle, target, targetHandle } = connection;
+
+    // If the connection is already aligned with the drag start, do nothing.
+    if (source === startNodeId) {
+      const [sourceSide] = sourceHandle.split('-');
+      const [targetSide] = targetHandle.split('-');
+      const final = {
+        source,
+        target,
+        sourceHandle: `${sourceSide}-source`,
+        targetHandle: `${targetSide}-target`,
       };
+      console.log(`Normalized (already correct): ${final.source} (${final.sourceHandle}) -> ${final.target} (${final.targetHandle})`);
+      return final;
     }
-    // Partially mismatched (loose mode can allow odd combos) -> prefer swapping to enforce source->target semantics
-    return {
-      ...p,
-      source: p.target,
-      target: p.source,
-      sourceHandle: p.targetHandle,
-      targetHandle: p.sourceHandle,
-    };
+
+    // If the drag started on the 'target' node of the connection, flip it.
+    if (target === startNodeId) {
+      const [sourceSide] = sourceHandle.split('-');
+      const [targetSide] = targetHandle.split('-');
+      const final = {
+        source: target, // The node where drag started
+        target: source, // The node where drag ended
+        sourceHandle: `${targetSide}-source`,
+        targetHandle: `${sourceSide}-target`,
+      };
+      console.log(`Normalized (flipped): ${final.source} (${final.sourceHandle}) -> ${final.target} (${final.targetHandle})`);
+      return final;
+    }
+
+    return connection; // Fallback
   }, []);
 
   const onConnect = useCallback((rawParams) => {
@@ -528,6 +547,8 @@ export default function TreeBoard({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
         nodeTypes={nodeTypes}
         onEdgeUpdate={onEdgeUpdate}
         connectionLineType="smoothstep"
