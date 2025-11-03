@@ -11,9 +11,10 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import FamilyNode from './FamilyNode';
+import MarriagePointNode from './nodes/MarriagePointNode';
 
 // Keep nodeTypes stable across renders to avoid React Flow warnings
-const nodeTypes = { familyNode: FamilyNode };
+const nodeTypes = { familyNode: FamilyNode, marriagePoint: MarriagePointNode };
 
 const initialNodes = [
   { id: 'me', position: { x: 0, y: 0 }, data: { label: 'You' }, type: 'familyNode' },

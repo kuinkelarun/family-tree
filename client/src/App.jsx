@@ -106,99 +106,173 @@ function App() {
 
   function mapTreeToGraph(tree) {
     const members = Array.isArray(tree.members) ? tree.members : [];
-    const posById = new Map(members.map(m => [String(m._id), m.position || { x: 0, y: 0 }]))
-    
-    // ONLY create nodes for members WITH positions (on canvas)
-    const n = members
-      .filter(m => hasPosVal(m.position))  // ⬅ Filter FIRST
-      .map((m, idx) => {
-        console.log(`[mapTreeToGraph] Adding member to canvas: ${m.name}`, m.position);
-        return {
-          id: m._id,
-          data: { label: m.name || `Member ${idx + 1}` },
-          position: { x: m.position.x, y: m.position.y },
-          // use the familyNode custom renderer so left/right handles are available
-          type: 'familyNode',
+    const posById = new Map(members.map(m => [String(m._id), m.position || { x: 0, y: 0 }]));
+    const membersById = new Map(members.map(m => [String(m._id), m]));
+
+    // 1. Create nodes for all members on the canvas
+    const personNodes = members
+      .filter(m => hasPosVal(m.position))
+      .map((m, idx) => ({
+        id: m._id,
+        data: { label: m.name || `Member ${idx + 1}` },
+        position: { x: m.position.x, y: m.position.y },
+        type: 'familyNode',
+      }));
+
+    const allNodes = [...personNodes];
+    const allEdges = [];
+    const processedMemberPairs = new Set(); // Tracks pairs like 'id1-id2' that are part of a family unit
+
+    // 2. Identify family units (spouse pairs and their children)
+    const spousePairs = new Map(); // spouseId -> partnerId
+    for (const member of members) {
+      for (const rel of member.relationships || []) {
+        if (rel.type === 'spouse') {
+          const p1 = String(member._id);
+          const p2 = String(rel.relative?._id || rel.relative);
+          const key = p1 < p2 ? `${p1}|${p2}` : `${p2}|${p1}`;
+          if (!spousePairs.has(key)) {
+            spousePairs.set(key, [p1, p2]);
+          }
+        }
+      }
+    }
+
+    for (const [pairKey, [p1Id, p2Id]] of spousePairs) {
+      const p1 = membersById.get(p1Id);
+      const p2 = membersById.get(p2Id);
+      if (!p1 || !p2) continue;
+
+      const p1Children = new Set((p1.relationships || []).filter(r => r.type === 'child').map(r => String(r.relative?._id || r.relative)));
+      const p2Children = new Set((p2.relationships || []).filter(r => r.type === 'child').map(r => String(r.relative?._id || r.relative)));
+      const commonChildren = [...p1Children].filter(cId => p2Children.has(cId));
+
+      if (commonChildren.length > 0) {
+        const p1Pos = posById.get(p1Id) || { x: 0, y: 0 };
+        const p2Pos = posById.get(p2Id) || { x: 0, y: 0 };
+
+        // Create a marriage point node between the parents
+        const marriagePointId = `m-${pairKey}`;
+        const marriagePointPos = {
+          x: (p1Pos.x + p2Pos.x) / 2 + 70, // offset to center between nodes
+          y: Math.max(p1Pos.y, p2Pos.y) + 50, // place below parents
         };
-      });
-    
-    console.log(`[mapTreeToGraph] Total members: ${members.length}, On canvas: ${n.length}`);
-    
-    // Build single, directional edges based on the original (authored) record.
-    // Heuristic: the authored record has a 'label' defined; reciprocal entries do not.
-    // Fallback: if neither has label (legacy), prefer 'parent' over 'child', otherwise first seen.
-    const pairMap = new Map(); // key: sorted 'a|b' -> edge payload
+
+        allNodes.push({
+          id: marriagePointId,
+          type: 'marriagePoint',
+          position: marriagePointPos,
+          data: { label: 'Marriage Point' },
+          draggable: false,
+          selectable: false,
+        });
+
+        // Edges from parents to marriage point
+        allEdges.push({
+          id: `e-${p1Id}-${marriagePointId}`,
+          source: p1Id,
+          target: marriagePointId,
+          sourceHandle: 'bottom-source',
+          targetHandle: 'top-target',
+          type: 'smoothstep',
+          style: { stroke: '#ccc', strokeWidth: 1.5 },
+        });
+        allEdges.push({
+          id: `e-${p2Id}-${marriagePointId}`,
+          source: p2Id,
+          target: marriagePointId,
+          targetHandle: 'top-target',
+          type: 'smoothstep',
+          style: { stroke: '#ccc', strokeWidth: 1.5 },
+        });
+
+        // Edges from marriage point to children
+        for (const childId of commonChildren) {
+          allEdges.push({
+            id: `e-${marriagePointId}-${childId}`,
+            source: marriagePointId,
+            target: childId,
+            sourceHandle: 'bottom-source',
+            targetHandle: 'top-target',
+            type: 'smoothstep',
+            label: 'child',
+            labelStyle: { fill: '#111827', fontSize: 12, fontWeight: 600 },
+            labelBgStyle: { fill: '#ffffff', fillOpacity: 0.95, stroke: RELATIONSHIP_COLORS.child, strokeWidth: 1 },
+            labelBgPadding: [3, 4],
+            labelBgBorderRadius: 4,
+            style: { stroke: RELATIONSHIP_COLORS.child, strokeWidth: 2 },
+            markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.child },
+          });
+        }
+
+        // Mark parents and children as processed for this type of relationship
+        processedMemberPairs.add(`${p1Id}-${p2Id}`);
+        processedMemberPairs.add(`${p2Id}-${p1Id}`);
+        commonChildren.forEach(cId => {
+          processedMemberPairs.add(`${p1Id}-${cId}`);
+          processedMemberPairs.add(`${cId}-${p1Id}`);
+          processedMemberPairs.add(`${p2Id}-${cId}`);
+          processedMemberPairs.add(`${cId}-${p2Id}`);
+        });
+      }
+    }
+
+    // 3. Process all other relationships that were not part of a family unit
+    const pairMap = new Map();
     for (const m of members) {
       for (const r of m.relationships || []) {
         const src = m._id;
         const dst = (r.relative && r.relative._id) || r.relative;
         if (!src || !dst) continue;
+
+        const pairKey = `${String(src)}-${String(dst)}`;
+        if (processedMemberPairs.has(pairKey)) continue;
+
         const a = String(src);
         const b = String(dst);
         const sortedKey = a < b ? `${a}|${b}` : `${b}|${a}`;
         const current = pairMap.get(sortedKey);
 
-  const type = r.type || 'custom';
-  const label = r.label || type;
-  const authored = !!r.authored;
+        const type = r.type || 'custom';
+        const label = r.label || type;
+        const authored = !!r.authored;
         const edgeColor = RELATIONSHIP_COLORS[type] || RELATIONSHIP_COLORS.custom;
         
-  // Display rule: always render edge as SOURCE -> TARGET (arrow points to target)
-  const displaySourceId = String(src);
-  const displayTargetId = String(dst);
-  const srcPos = posById.get(displaySourceId) || { x: 0, y: 0 };
-  const dstPos = posById.get(displayTargetId) || { x: 0, y: 0 };
+        const displaySourceId = String(src);
+        const displayTargetId = String(dst);
+        const srcPos = posById.get(displaySourceId) || { x: 0, y: 0 };
+        const dstPos = posById.get(displayTargetId) || { x: 0, y: 0 };
         const dx = (dstPos.x || 0) - (srcPos.x || 0);
         const dy = (dstPos.y || 0) - (srcPos.y || 0);
 
-        function sideForHorizontal(isRight) {
-          return isRight ? 'right' : 'left';
-        }
-        function sideForVertical(isDown) {
-          return isDown ? 'bottom' : 'top';
-        }
-
-        let sourceHandle = undefined;
-        let targetHandle = undefined;
-
+        let sourceHandle, targetHandle;
         if (type === 'parent') {
-          // For relationship type "parent": source is the child and target is the parent (upwards)
-          // Draw from source TOP to target BOTTOM
           sourceHandle = 'top-source';
           targetHandle = 'bottom-target';
         } else if (type === 'child') {
-          // For relationship type "child": source is the parent and target is the child (downwards)
-          // Draw from source BOTTOM to target TOP
           sourceHandle = 'bottom-source';
           targetHandle = 'top-target';
         } else if (type === 'spouse' || type === 'sibling') {
-          // horizontal preferred; choose sides based on relative x
-          const srcRight = dx >= 0; // target is to the right
-          sourceHandle = `${sideForHorizontal(srcRight)}-source`;
-          targetHandle = `${sideForHorizontal(!srcRight)}-target`;
+          const srcRight = dx >= 0;
+          sourceHandle = `${srcRight ? 'right' : 'left'}-source`;
+          targetHandle = `${!srcRight ? 'right' : 'left'}-target`;
         } else {
-          // custom: choose dominant axis
           if (Math.abs(dx) >= Math.abs(dy)) {
             const srcRight = dx >= 0;
-            sourceHandle = `${sideForHorizontal(srcRight)}-source`;
-            targetHandle = `${sideForHorizontal(!srcRight)}-target`;
+            sourceHandle = `${srcRight ? 'right' : 'left'}-source`;
+            targetHandle = `${!srcRight ? 'right' : 'left'}-target`;
           } else {
             const srcDown = dy >= 0;
-            sourceHandle = `${sideForVertical(srcDown)}-source`;
-            targetHandle = `${sideForVertical(!srcDown)}-target`;
+            sourceHandle = `${srcDown ? 'bottom' : 'top'}-source`;
+            targetHandle = `${!srcDown ? 'bottom' : 'top'}-target`;
           }
         }
 
-  // Configure arrow markers: arrow at the end (target)
-  const markers = { markerEnd: { type: 'arrowclosed', color: edgeColor } };
-
-        // Generate edge ID that includes direction to prevent React Flow from reusing old edges
-        // Use source->target order (not sorted) so ID changes if direction changes
+        const markers = { markerEnd: { type: 'arrowclosed', color: edgeColor } };
         const edgeId = `${String(src)}-${String(dst)}-${type}`;
 
         const candidate = {
           id: edgeId,
-          // Display edge as SOURCE -> TARGET (arrow points to target)
           source: displaySourceId,
           target: displayTargetId,
           type: 'smoothstep',
@@ -211,105 +285,43 @@ function App() {
           labelBgBorderRadius: 4,
           style: { stroke: edgeColor, strokeWidth: 2 },
           ...markers,
-          // Keep original logical direction for editing APIs
           data: { type, label, authored, from: String(src), to: String(dst) },
         };
 
         if (!current) {
-          // Store the edge metadata with actual source and target from the edge object
           pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, authored, type, src: String(src), dst: String(dst) });
         } else {
-          // Preference logic for which edge to keep:
-          // 1. For spouse/sibling: always prefer lexicographically smaller ID as source (consistent direction)
-          // 2. For parent/child: prefer the authored record (hasLabel), or prefer 'parent' over 'child'
-          // 3. For others: prefer the authored record (hasLabel)
-          
           let preferThis = false;
-          // Debug info to help track direction decisions
-          const debugInfo = {
-            key: sortedKey,
-            candidate: { src: String(src), dst: String(dst), type, hasLabel: !!r.label, authored },
-            current: { src: current.src, dst: current.dst, type: current.type, hasLabel: current.hasLabel, authored: current.authored },
-          };
-          
           if (type === 'parent' || type === 'child') {
-            // For parent/child, prefer the entry WITH A LABEL (user's intention)
-            // This ensures the relationship type the user selected is displayed
-            // First priority: prefer the entry that was authored at creation time
-            if (authored && !current.authored) {
-              preferThis = true;
-            } else if (!authored && current.authored) {
-              preferThis = false;
-            } else {
-            // First priority: prefer the entry with a label (user's explicit choice)
-            if (!!r.label && !current.hasLabel) {
-              preferThis = true; // This entry has label, current doesn't
-            } else if (!r.label && current.hasLabel) {
-              preferThis = false; // Current has label, keep it
-            } 
-            // If both have labels OR both don't have labels, normalize to 'parent' type
-            else if (type === 'parent' && current.type === 'child') {
-              preferThis = true; // Prefer 'parent' over 'child' as tiebreaker
-            } else if (type === 'child' && current.type === 'parent') {
-              preferThis = false; // Keep 'parent' as tiebreaker
-            } else {
-              // Both same type and same label status (rare)
-              preferThis = false; // Keep first one
-            }
-            }
+            if (authored && !current.authored) preferThis = true;
+            else if (!authored && current.authored) preferThis = false;
+            else if (!!r.label && !current.hasLabel) preferThis = true;
+            else if (!r.label && current.hasLabel) preferThis = false;
+            else if (type === 'parent' && current.type === 'child') preferThis = true;
+            else if (type === 'child' && current.type === 'parent') preferThis = false;
+            else preferThis = false;
           } else if (type === 'sibling' || type === 'spouse') {
-            // For symmetric relationships (spouse/sibling): prefer the explicitly authored entry (has label).
-            // If neither side has a label, keep the first-seen direction to remain deterministic.
-            const candidateHasLabel = !!r.label;
-            const currentHasLabel = current.hasLabel;
-            if (authored && !current.authored) {
-              preferThis = true;
-            } else if (!authored && current.authored) {
-              preferThis = false;
-            } else if (candidateHasLabel && !currentHasLabel) {
-              preferThis = true;
-            } else if (!candidateHasLabel && currentHasLabel) {
-              preferThis = false;
-            } else {
-              // Neither or both have labels -> keep the first encountered (do not force lexicographic ordering)
-              preferThis = false;
-            }
-          } else if (type === 'custom') {
-            // For custom relationships, use consistent direction like spouse/sibling
-            // This handles cases where users create bidirectional custom relationships
-            
-            const candidateSourceId = String(src);
-            const candidateTargetId = String(dst);
-            const candidateCorrectDirection = candidateSourceId < candidateTargetId;
-            const currentCorrectDirection = current.src < current.dst;
-            
-            if (!currentCorrectDirection && candidateCorrectDirection) {
-              preferThis = true;
-            } else if (currentCorrectDirection && !candidateCorrectDirection) {
-              preferThis = false;
-            } else {
-              preferThis = (authored && !current.authored) || (!!r.label && !current.hasLabel);
-            }
+            if (authored && !current.authored) preferThis = true;
+            else if (!authored && current.authored) preferThis = false;
+            else if (!!r.label && !current.hasLabel) preferThis = true;
+            else if (!r.label && current.hasLabel) preferThis = false;
+            else preferThis = false;
           } else {
-            // Fallback for any other relationship types
             preferThis = (authored && !current.authored) || (!!r.label && !current.hasLabel);
           }
           
           if (preferThis) {
-            console.debug('[mapTreeToGraph] Replacing edge for', debugInfo.key, 'decision=preferThis', debugInfo);
-            // Store the edge metadata with actual source and target from the edge object
             pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, authored, type, src: String(src), dst: String(dst) });
-          }
-          else {
-            console.debug('[mapTreeToGraph] Keeping existing edge for', debugInfo.key, 'decision=keepCurrent', debugInfo);
           }
         }
       }
     }
-    const rawEdges = Array.from(pairMap.values()).map((v) => v.edge);
+    
+    const remainingEdges = Array.from(pairMap.values()).map((v) => v.edge);
+    allEdges.push(...remainingEdges);
 
-    // Bundle overlapping/parallel edges by type and axis; keep one label per bundle
-    const e = bundleEdges(rawEdges, n);
+    const e = bundleEdges(allEdges, allNodes);
+    const n = allNodes;
     return { n, e, members };
   }
 
