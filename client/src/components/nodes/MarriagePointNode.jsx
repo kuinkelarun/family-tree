@@ -53,7 +53,7 @@ export default function MarriagePointNode({ data, selected }) {
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: 10,
-          cursor: 'default',
+            cursor: 'grab',
           transition: 'all 0.2s ease',
         }}
       >

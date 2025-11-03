@@ -162,7 +162,8 @@ function App() {
           id: marriagePointId,
           type: 'marriagePoint',
           position: marriagePointPos,
-          data: { label: 'Marriage Point' },
+          // keep minimal data but record parents so interactions from this node can act on both parents
+          data: { parents: [p1Id, p2Id], type: 'marriage', verified: false },
           // allow dragging the marriage point in the canvas (visual only)
           draggable: true,
           // keep unselectable to avoid editing modal; selection is handled only for familyNode
@@ -495,8 +496,63 @@ function App() {
     console.log('[UI Debug] MemberModal open =', modalOpen, 'selectedId =', selectedId);
   }, [modalOpen, selectedId]);
 
-  function handleConnectEdge(params) {
+  async function handleConnectEdge(params) {
     if (!treeId) return;
+    console.log(`[handleConnectEdge] Connection initiated: ${params.source} (${params.sourceHandle}) -> ${params.target} (${params.targetHandle})`);
+
+    // If initiating from a marriage point (visual hub), automatically create child relationships
+    // from both parents to the target member (skipping duplicates).
+    try {
+      const src = String(params.source || '');
+      const tgt = String(params.target || '');
+
+      if (src.startsWith('m-')) {
+        // find the marriage node in current nodes
+        const marriageNode = nodes.find(n => String(n.id) === src);
+        const parents = marriageNode?.data?.parents || [];
+
+        if (!parents || !parents.length) {
+          showToast('Marriage point has no parent info');
+          return;
+        }
+
+        // disallow connecting marriage point to another marriage point
+        if (tgt.startsWith('m-')) {
+          showToast('Cannot connect marriage point to another marriage point');
+          return;
+        }
+
+        const ops = [];
+        for (const parentId of parents) {
+          // skip self-connections
+          if (String(parentId) === tgt) continue;
+
+          // Skip if an explicit child relationship already exists between this parent and the target
+          const parentMember = members.find(m => String(m._id) === String(parentId));
+          const already = (parentMember?.relationships || []).some(r => String((r.relative && r.relative._id) || r.relative) === String(tgt) && r.type === 'child');
+          if (already) continue;
+
+          ops.push(Relationships.create({ fromMemberId: parentId, toMemberId: tgt, type: 'child', label: 'child' }));
+        }
+
+        if (!ops.length) {
+          showToast('No new child relationships to add');
+          return;
+        }
+
+        await Promise.all(ops);
+        setPreviewEdge(null);
+        await loadTree(treeId);
+        showToast('Child relationship(s) added');
+        return;
+      }
+    } catch (e) {
+      console.error('[handleConnectEdge] auto-create from marriage point failed', e);
+      showToast(`Failed to create relationships: ${e?.message || e}`);
+      return;
+    }
+
+    // Default behavior: open relationship picker for manual relationship creation
     console.log(`[handleConnectEdge] Opening picker for connection: ${params.source} (${params.sourceHandle}) -> ${params.target} (${params.targetHandle})`);
     setRelPicker({ open: true, source: params.source, target: params.target, sourceHandle: params.sourceHandle, targetHandle: params.targetHandle });
   }
