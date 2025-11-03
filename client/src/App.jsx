@@ -109,15 +109,22 @@ function App() {
     const posById = new Map(members.map(m => [String(m._id), m.position || { x: 0, y: 0 }]));
     const membersById = new Map(members.map(m => [String(m._id), m]));
 
-    // 1. Create nodes for all members on the canvas
-    const personNodes = members
-      .filter(m => hasPosVal(m.position))
-      .map((m, idx) => ({
+    // 1. Create nodes for all members on the canvas.
+    // If a member has a saved position, use it. Otherwise prefer the current UI node position
+    // (so transient UI drags are preserved across a reload), and fallback to a sensible grid.
+    const personNodes = members.map((m, idx) => {
+      const savedPos = hasPosVal(m.position) ? { x: m.position.x, y: m.position.y } : null;
+      // If the app already has this node in the current UI state, prefer that position when savedPos is missing.
+      const uiNode = nodes?.find?.(n => String(n.id) === String(m._id));
+      const uiPos = uiNode && uiNode.position && typeof uiNode.position.x === 'number' && typeof uiNode.position.y === 'number' ? { x: uiNode.position.x, y: uiNode.position.y } : null;
+      const pos = savedPos || uiPos || fallbackPosForIndex(idx);
+      return {
         id: m._id,
         data: { label: m.name || `Member ${idx + 1}` },
-        position: { x: m.position.x, y: m.position.y },
+        position: pos,
         type: 'familyNode',
-      }));
+      };
+    });
 
     const allNodes = [...personNodes];
     const allEdges = [];
@@ -148,16 +155,31 @@ function App() {
       const commonChildren = [...p1Children].filter(cId => p2Children.has(cId));
 
       if (commonChildren.length > 0) {
-        const p1Pos = posById.get(p1Id) || { x: 0, y: 0 };
-        const p2Pos = posById.get(p2Id) || { x: 0, y: 0 };
-
-        // Create a marriage point node between the parents
+        // Define marriage point id up-front
         const marriagePointId = `m-${pairKey}`;
-        const marriagePointPos = {
-          x: (p1Pos.x + p2Pos.x) / 2 + 70, // offset to center between nodes
-          y: Math.max(p1Pos.y, p2Pos.y) + 50, // place below parents
-        };
+        let marriagePointPos = null;
 
+        // For parent positions prefer saved positions, then current UI node positions (so transient drags are preserved), then fallback.
+        const p1Saved = hasPosVal(p1.position) ? { x: p1.position.x, y: p1.position.y } : null;
+        const p2Saved = hasPosVal(p2.position) ? { x: p2.position.x, y: p2.position.y } : null;
+        const p1Ui = nodes?.find?.(n => String(n.id) === p1Id)?.position || null;
+        const p2Ui = nodes?.find?.(n => String(n.id) === p2Id)?.position || null;
+        const p1Pos = p1Saved || p1Ui || { x: 0, y: 0 };
+        const p2Pos = p2Saved || p2Ui || { x: 0, y: 0 };
+
+        // Prefer any existing marriage node position first (user may have dragged it), otherwise compute from parent positions.
+        const existingMarriageNode = nodes?.find?.((n) => String(n.id) === marriagePointId);
+        if (existingMarriageNode && existingMarriageNode.position && typeof existingMarriageNode.position.x === 'number' && typeof existingMarriageNode.position.y === 'number') {
+          // Use the previously dragged marriage point position
+          marriagePointPos = { x: existingMarriageNode.position.x, y: existingMarriageNode.position.y };
+        } else {
+          marriagePointPos = {
+            x: (p1Pos.x + p2Pos.x) / 2 + 70, // offset to center between nodes
+            y: Math.max(p1Pos.y, p2Pos.y) + 50, // place below parents
+          };
+        }
+
+        // Push a single marriage point node
         allNodes.push({
           id: marriagePointId,
           type: 'marriagePoint',
@@ -228,6 +250,9 @@ function App() {
             labelBgBorderRadius: 4,
             style: { stroke: RELATIONSHIP_COLORS.child, strokeWidth: 2 },
             markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.child },
+            // Surface a logical relationship so edge editor maps to a real DB relationship.
+            // Map to the first parent by default (editing will operate on that relationship).
+            data: { type: 'child', label: 'child', from: p1Id, to: childId },
           });
         }
 
@@ -728,6 +753,14 @@ function App() {
   // Edge editing and export helpers
   const [edgeEditor, setEdgeEditor] = useState({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0 });
   function handleEdgeClick(e, edge) {
+    // If this edge is connected to a marriage point on the parent side (parent -> marriage),
+    // edits should be performed on the marriage->child edge instead because the parent->marriage
+    // edge is a visual helper. Inform the user.
+    if (String(edge?.target || '').startsWith('m-') && !String(edge?.source || '').startsWith('m-')) {
+      showToast('Edit child relationships by clicking the marriage→child edge');
+      return;
+    }
+
     const type = edge?.data?.type || (String(edge?.id || '').split('-').pop() || 'custom');
     const label = edge?.data?.label || edge?.label || '';
     // Use original logical direction for edit operations (from = data.from, to = data.to)
