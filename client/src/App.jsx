@@ -753,9 +753,7 @@ function App() {
   // Edge editing and export helpers
   const [edgeEditor, setEdgeEditor] = useState({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0 });
   function handleEdgeClick(e, edge) {
-    // If this edge is connected to a marriage point on the parent side (parent -> marriage),
-    // edits should be performed on the marriage->child edge instead because the parent->marriage
-    // edge is a visual helper. Inform the user.
+    // If this edge is parent->marriage (parent -> m-...), it's a visual helper: advise user and don't open editor
     if (String(edge?.target || '').startsWith('m-') && !String(edge?.source || '').startsWith('m-')) {
       showToast('Edit child relationships by clicking the marriage→child edge');
       return;
