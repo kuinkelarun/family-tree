@@ -6,7 +6,8 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
   const [b, setB] = useState('');
   const [depth, setDepth] = useState(10);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [resultAB, setResultAB] = useState(null);
+  const [resultBA, setResultBA] = useState(null);
   const [error, setError] = useState('');
 
   const sortedMembers = useMemo(() => {
@@ -19,9 +20,14 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
     try {
       setError('');
       setLoading(true);
-      setResult(null);
-      const res = await Trees.kinship(treeId, a, b, depth);
-      setResult(res);
+      setResultAB(null);
+      setResultBA(null);
+      const [resAB, resBA] = await Promise.all([
+        Trees.kinship(treeId, a, b, depth),
+        Trees.kinship(treeId, b, a, depth),
+      ]);
+      setResultAB(resAB);
+      setResultBA(resBA);
     } catch (e) {
       setError(e?.message || 'Query failed');
     } finally {
@@ -54,22 +60,26 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
         </div>
         {error && <div style={{ marginTop: 10, color: '#b91c1c' }}>{error}</div>}
         {loading && <div style={{ marginTop: 10, color: '#64748b' }}>Computing…</div>}
-        {result && (
+        {(resultAB || resultBA) && (
           <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
-            <div>
-              <span style={{ fontWeight: 600 }}>Label:</span> {result.label}
-            </div>
-            <div>
-              <span style={{ fontWeight: 600 }}>Class:</span> {result.class}
-            </div>
-            {result.meta && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }}>
-                {result.meta.degree != null && <div><span style={{ fontWeight: 600 }}>Degree</span>: {result.meta.degree}</div>}
-                {result.meta.removal != null && <div><span style={{ fontWeight: 600 }}>Removal</span>: {result.meta.removal}</div>}
-                {result.meta.steps != null && <div><span style={{ fontWeight: 600 }}>Steps</span>: {result.meta.steps}</div>}
-                {result.meta.k != null && <div><span style={{ fontWeight: 600 }}>k</span>: {result.meta.k}</div>}
-                {result.meta.l != null && <div><span style={{ fontWeight: 600 }}>l</span>: {result.meta.l}</div>}
-                {result.meta.mrcaId && <div><span style={{ fontWeight: 600 }}>MRCA</span>: {result.meta.mrcaId}</div>}
+            {resultAB && (
+              <div style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                <div style={{ marginBottom: 4 }}>
+                  <strong>{(members.find(m => String(m._id) === String(a)) || {}).name || 'A'}</strong> is
+                  {' '}<strong>{resultAB.label}</strong>{' '}of{' '}
+                  <strong>{(members.find(m => String(m._id) === String(b)) || {}).name || 'B'}</strong>
+                </div>
+                <div style={{ color: '#475569' }}>Class: {resultAB.class}</div>
+              </div>
+            )}
+            {resultBA && (
+              <div style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                <div style={{ marginBottom: 4 }}>
+                  <strong>{(members.find(m => String(m._id) === String(b)) || {}).name || 'B'}</strong> is
+                  {' '}<strong>{resultBA.label}</strong>{' '}of{' '}
+                  <strong>{(members.find(m => String(m._id) === String(a)) || {}).name || 'A'}</strong>
+                </div>
+                <div style={{ color: '#475569' }}>Class: {resultBA.class}</div>
               </div>
             )}
           </div>

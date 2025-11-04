@@ -114,19 +114,20 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
     return { label: 'spouse', class: 'affinal', meta: { affinal: true } };
   }
 
-  // Lineal: descendants
+  // Lineal (A relative to B):
+  // If B is a descendant of A, then A is an ancestor of B (parent/grandparent...).
   const downA = bfsDown(a, childrenOf, depthLimit);
   if (downA.has(b)) {
     const d = downA.get(b);
-    const label = linealLabel('down', d);
-    return { label, class: 'lineal', meta: { direction: 'descendant', steps: d } };
+    const label = linealLabel('up', d); // A is parent/grandparent of B
+    return { label, class: 'lineal', meta: { role: 'ancestor', steps: d } };
   }
-  // Lineal: ancestors
+  // If B is an ancestor of A, then A is a descendant of B (child/grandchild...).
   const upA = bfsUp(a, parentsOf, depthLimit);
   if (upA.has(b)) {
     const d = upA.get(b);
-    const label = linealLabel('up', d);
-    return { label, class: 'lineal', meta: { direction: 'ancestor', steps: d } };
+    const label = linealLabel('down', d); // A is child/grandchild of B
+    return { label, class: 'lineal', meta: { role: 'descendant', steps: d } };
   }
 
   // Siblings / half-siblings
@@ -175,8 +176,17 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
 
 export function kinshipBetween(A, B, members, options = {}) {
   const graphs = buildAdjacency(members);
-  const res = classifyConsanguine(A, B, graphs, options);
-  return { ...res, meta: { ...(res.meta || {}), affinal: false, step: false } };
+  // Base consanguine/spouse/sibling detection
+  const base = classifyConsanguine(A, B, graphs, options);
+  // If we already have a specific non-none label (including spouse), return it
+  if (base && base.class !== 'none' && base.label && !/^related \(undetermined/.test(base.label)) {
+    return { ...base, meta: { ...(base.meta || {}), affinal: !!(base.class === 'affinal'), step: false } };
+  }
+  // Try step- and in-law overlays
+  const over = overlayAffinalStep(A, B, graphs, options);
+  if (over) return over;
+  // Fallback to base (unrelated or undetermined)
+  return { ...base, meta: { ...(base.meta || {}), affinal: false, step: false } };
 }
 
 // -------- helpers --------
@@ -205,4 +215,75 @@ function removalLabel(rem) {
   if (rem === 1) return 'once removed';
   if (rem === 2) return 'twice removed';
   return `${rem} times removed`;
+}
+
+// -------- affinal & step overlays --------
+export function overlayAffinalStep(A, B, graphs, options = {}) {
+  const { parentsOf, spousesOf } = graphs;
+  const a = String(A), b = String(B);
+
+  // Step-parent / step-child
+  // A is spouse of a parent of B (but not a parent) => A is step-parent of B
+  for (const p of (parentsOf.get(b) || [])) {
+    if ((spousesOf.get(p) || new Set()).has(a) && !(parentsOf.get(b) || new Set()).has(a)) {
+      return { label: 'step-parent', class: 'step', meta: { role: 'step-parent', viaParent: p, affinal: false, step: true } };
+    }
+  }
+  // B is spouse of a parent of A (but not a parent) => A is step-child of B
+  for (const p of (parentsOf.get(a) || [])) {
+    if ((spousesOf.get(p) || new Set()).has(b) && !(parentsOf.get(a) || new Set()).has(b)) {
+      return { label: 'step-child', class: 'step', meta: { role: 'step-child', viaParent: p, affinal: false, step: true } };
+    }
+  }
+
+  // Step-sibling: parents not shared, but a parent of A is married to a parent of B
+  const pA = parentsOf.get(a) || new Set();
+  const pB = parentsOf.get(b) || new Set();
+  if (intersectCount(pA, pB) === 0) {
+    for (const pa of pA) {
+      const sp = spousesOf.get(pa) || new Set();
+      for (const pb of pB) {
+        if (sp.has(pb)) {
+          return { label: 'step-sibling', class: 'step', meta: { viaParents: [pa, pb], affinal: false, step: true } };
+        }
+      }
+    }
+  }
+
+  // In-law overlays: consanguine relation with the other's spouse, or between spouses
+  // 1) A with any spouse of B
+  for (const sb of (spousesOf.get(b) || [])) {
+    const r = classifyConsanguine(a, sb, graphs, options);
+    if (r && r.class !== 'none' && r.label && !/^related \(undetermined/.test(r.label) && r.label !== 'unrelated (by blood)') {
+      return affinalize(r);
+    }
+  }
+  // 2) Any spouse of A with B
+  for (const sa of (spousesOf.get(a) || [])) {
+    const r = classifyConsanguine(sa, b, graphs, options);
+    if (r && r.class !== 'none' && r.label && !/^related \(undetermined/.test(r.label) && r.label !== 'unrelated (by blood)') {
+      return affinalize(r);
+    }
+  }
+  // 3) Spouse of A with spouse of B
+  for (const sa of (spousesOf.get(a) || [])) {
+    for (const sb of (spousesOf.get(b) || [])) {
+      const r = classifyConsanguine(sa, sb, graphs, options);
+      if (r && r.class !== 'none' && r.label && !/^related \(undetermined/.test(r.label) && r.label !== 'unrelated (by blood)') {
+        return affinalize(r);
+      }
+    }
+  }
+
+  return null;
+}
+
+function affinalize(res) {
+  // Normalize some common labels to -in-law forms
+  let base = res.label || '';
+  // Map half-sibling -> sibling-in-law as common social label
+  if (base === 'half-sibling') base = 'sibling';
+  // parent/grandparent/...-in-law, sibling-in-law, cousin-in-law, aunt/uncle-in-law, niece/nephew-in-law
+  const label = `${base} in-law`;
+  return { label, class: 'affinal', meta: { ...(res.meta || {}), affinal: true, step: false } };
 }
