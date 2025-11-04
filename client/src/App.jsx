@@ -168,11 +168,16 @@ function App() {
         const p2Pos = p2Saved || p2Ui || { x: 0, y: 0 };
 
         // Prefer any existing marriage node position first (user may have dragged it), otherwise compute from parent positions.
-        const existingMarriageNode = nodes?.find?.((n) => String(n.id) === marriagePointId);
-        if (existingMarriageNode && existingMarriageNode.position && typeof existingMarriageNode.position.x === 'number' && typeof existingMarriageNode.position.y === 'number') {
-          // Use the previously dragged marriage point position
-          marriagePointPos = { x: existingMarriageNode.position.x, y: existingMarriageNode.position.y };
-        } else {
+          const existingMarriageNode = nodes?.find?.((n) => String(n.id) === marriagePointId);
+          // Also check persisted marriagePoints returned from the server
+          const savedMarriagePoint = (tree.marriagePoints || []).find(mp => String(mp.id) === marriagePointId);
+          if (existingMarriageNode && existingMarriageNode.position && typeof existingMarriageNode.position.x === 'number' && typeof existingMarriageNode.position.y === 'number') {
+            // Use the previously dragged marriage point position from UI state
+            marriagePointPos = { x: existingMarriageNode.position.x, y: existingMarriageNode.position.y };
+          } else if (savedMarriagePoint && savedMarriagePoint.position && typeof savedMarriagePoint.position.x === 'number' && typeof savedMarriagePoint.position.y === 'number') {
+            // Use persisted marriage point position from the tree
+            marriagePointPos = { x: savedMarriagePoint.position.x, y: savedMarriagePoint.position.y };
+          } else {
           marriagePointPos = {
             x: (p1Pos.x + p2Pos.x) / 2 + 70, // offset to center between nodes
             y: Math.max(p1Pos.y, p2Pos.y) + 50, // place below parents
@@ -236,6 +241,10 @@ function App() {
 
         // Edges from marriage point to children
         for (const childId of commonChildren) {
+          // Prefer an existing label from either parent relationship to the child (non-empty), otherwise default to 'child'
+          const p1Rel = (p1.relationships || []).find(r => String((r.relative && r.relative._id) || r.relative) === String(childId));
+          const p2Rel = (p2.relationships || []).find(r => String((r.relative && r.relative._id) || r.relative) === String(childId));
+          const labelText = (p1Rel && p1Rel.label) || (p2Rel && p2Rel.label) || 'child';
           allEdges.push({
             id: `e-${marriagePointId}-${childId}`,
             source: marriagePointId,
@@ -243,7 +252,7 @@ function App() {
             sourceHandle: 'bottom-source',
             targetHandle: 'top-target',
             type: 'smoothstep',
-            label: 'child',
+            label: labelText,
             labelStyle: { fill: '#111827', fontSize: 12, fontWeight: 600 },
             labelBgStyle: { fill: '#ffffff', fillOpacity: 0.95, stroke: RELATIONSHIP_COLORS.child, strokeWidth: 1 },
             labelBgPadding: [3, 4],
@@ -252,7 +261,7 @@ function App() {
             markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.child },
             // Surface a logical relationship so edge editor maps to a real DB relationship.
             // Map to the first parent by default (editing will operate on that relationship).
-            data: { type: 'child', label: 'child', from: p1Id, to: childId },
+            data: { type: 'child', label: labelText, from: p1Id, to: childId },
           });
         }
 
@@ -710,6 +719,15 @@ function App() {
       if (node.type === 'marriagePoint') {
         console.log(`[handleNodeDragStop] Updating marriage point position locally for ${node.id}:`, { x, y });
         setNodes((nds) => nds.map((n) => (String(n.id) === String(node.id) ? { ...n, position: { x, y } } : n)));
+        try {
+          if (treeId) {
+            // Persist marriage point position to tree metadata
+            await Trees.updateMarriagePoint(treeId, { id: node.id, position: { x, y } });
+            console.log('[handleNodeDragStop] Marriage point position persisted to server');
+          }
+        } catch (e) {
+          console.error('[handleNodeDragStop] Failed to persist marriage point position:', e?.message || e, e);
+        }
         return;
       }
 
@@ -778,19 +796,41 @@ function App() {
         if (!parents.length) {
           showToast('No parents found for marriage point');
         } else {
-          const ops = [];
+          // Perform updates sequentially to avoid concurrent-modification/version conflicts
+          let successCount = 0;
           for (const pid of parents) {
-            // find existing relationship type for this parent->child, fallback to 'child'
-            const parentMember = members.find(m => String(m._id) === String(pid));
-            const rel = (parentMember?.relationships || []).find(r => String((r.relative && r.relative._id) || r.relative) === String(editor.target));
-            const existingType = rel?.type || 'child';
-            // We lock type for marriage->child edges; only update label across parents
-            ops.push(Relationships.update({ fromMemberId: pid, toMemberId: editor.target, type: existingType, newType: existingType, label: newLabel }));
+            try {
+              const parentMember = members.find(m => String(m._id) === String(pid));
+              const rel = (parentMember?.relationships || []).find(r => String((r.relative && r.relative._id) || r.relative) === String(editor.target));
+              const existingType = rel?.type || 'child';
+              if (!rel) {
+                // nothing to update for this parent
+                continue;
+              }
+              await Relationships.update({ fromMemberId: pid, toMemberId: editor.target, type: existingType, newType: existingType, label: newLabel });
+              successCount++;
+            } catch (e) {
+              const msg = (e && e.message) || String(e || '');
+              if (msg.includes('No matching document') || msg.includes('version')) {
+                // Reload tree and retry this single parent once
+                try {
+                  await loadTree(treeId);
+                  const parentMember2 = members.find(m => String(m._id) === String(pid));
+                  const rel2 = (parentMember2?.relationships || []).find(r => String((r.relative && r.relative._id) || r.relative) === String(editor.target));
+                  const existingType2 = rel2?.type || 'child';
+                  if (rel2) await Relationships.update({ fromMemberId: pid, toMemberId: editor.target, type: existingType2, newType: existingType2, label: newLabel });
+                } catch (err2) {
+                  console.error('[updateEdge] retry update failed for parent', pid, err2);
+                }
+              } else {
+                console.error('[updateEdge] update failed for parent', pid, e);
+              }
+            }
           }
-          await Promise.all(ops);
           setEdgeEditor({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0, originalEdge: null });
           await loadTree(treeId);
-          showToast('Relationship label updated for parents');
+          if (successCount > 0) showToast('Updated parent→child relationship label(s)');
+          else showToast('No parent→child relationships were updated');
         }
         return;
       }

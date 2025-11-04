@@ -18,6 +18,20 @@ const FamilyTreeSchema = new mongoose.Schema(
       visibility: { type: String, enum: ['private', 'shared', 'public'], default: 'private' },
       styles: { type: Object, default: {} },
     },
+    // Visual-only nodes for bundling connections (virtual marriage points)
+    marriagePoints: {
+      type: [
+        {
+          id: { type: String, required: true },
+          parents: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Member' }], default: [] },
+          position: {
+            x: { type: Number, required: false },
+            y: { type: Number, required: false },
+          },
+        }
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

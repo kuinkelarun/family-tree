@@ -41,10 +41,12 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
 
   // Auto-update label when type changes, unless the user has manually edited the label.
   useEffect(() => {
-    // On type change, automatically update the label to match the type (empty for custom).
-    // This keeps the label in sync by default but the user can override by typing.
-    setLocalLabel(localType === 'custom' ? '' : localType);
-    setLabelEdited(false);
+    // On type change, automatically update the label to match the type (empty for custom)
+    // only if the user hasn't manually edited the label. If the user provided a custom
+    // label (labelEdited === true), preserve it.
+    if (!labelEdited) {
+      setLocalLabel(localType === 'custom' ? '' : localType);
+    }
     // do not include localLabel or labelEdited in deps to avoid loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localType]);

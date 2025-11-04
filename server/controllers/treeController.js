@@ -56,3 +56,37 @@ export async function deleteTree(req, res) {
     res.status(500).json({ error: e.message });
   }
 }
+
+export async function updateMarriagePoint(req, res) {
+  try {
+    const treeId = req.params.id;
+    const { id, position, parents } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'marriage point id required' });
+
+    const tree = await FamilyTree.findById(treeId);
+    if (!tree) return res.status(404).json({ error: 'Not found' });
+
+    // Permission: owner or editor
+    const allowed = String(tree.owner) === String(req.user.id) ||
+      tree.permissions?.some((p) => String(p.user) === String(req.user.id) && p.access !== 'viewer');
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+
+    // Locate existing marriagePoint by id
+    const idx = (tree.marriagePoints || []).findIndex(mp => String(mp.id) === String(id));
+    const toSet = { id };
+    if (Array.isArray(parents)) toSet.parents = parents.map(p => p);
+    if (position && typeof position.x === 'number' && typeof position.y === 'number') toSet.position = { x: position.x, y: position.y };
+
+    if (idx >= 0) {
+      // merge
+      tree.marriagePoints[idx] = { ...tree.marriagePoints[idx].toObject?.(), ...toSet };
+    } else {
+      tree.marriagePoints.push(toSet);
+    }
+
+    await tree.save();
+    res.json({ ok: true, marriagePoints: tree.marriagePoints });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}

@@ -50,6 +50,7 @@ export const Trees = {
   async list() { return api('/api/trees'); },
   async get(id) { return api(`/api/trees/${id}`); },
   async delete(id) { return api(`/api/trees/${id}`, { method: 'DELETE' }); },
+  async updateMarriagePoint(id, payload) { return api(`/api/trees/${id}/marriage-points`, { method: 'PUT', body: payload }); },
 };
 
 export const Members = {
