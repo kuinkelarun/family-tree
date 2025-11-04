@@ -143,6 +143,66 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
     return { label: 'sibling', class: 'collateral', meta: { explicit: true } };
   }
 
+  // Collateral via explicit siblings: aunt/uncle and niece/nephew through sibling-of-parent (or higher ancestors)
+  // Case 1: A is sibling of an ancestor of B => A is (great-)* aunt/uncle of B
+  const upB2 = bfsUp(b, parentsOf, depthLimit);
+  let bestAU = null;
+  for (const [anc, k] of upB2) {
+    if (k < 1) continue;
+    if ((siblingsOf.get(anc) || new Set()).has(a)) {
+      if (!bestAU || k < bestAU.k) bestAU = { anc, k };
+    }
+  }
+  if (bestAU) {
+    const label = auntUncleLabel(bestAU.k);
+    return { label, class: 'collateral', meta: { viaAncestor: bestAU.anc, stepsUp: bestAU.k, kind: 'aunt-uncle' } };
+  }
+
+  // Case 2: B is sibling of an ancestor of A => A is (great-)* niece/nephew of B
+  const upA2 = bfsUp(a, parentsOf, depthLimit);
+  let bestNN = null;
+  for (const [anc, k] of upA2) {
+    if (k < 1) continue;
+    if ((siblingsOf.get(anc) || new Set()).has(b)) {
+      if (!bestNN || k < bestNN.k) bestNN = { anc, k };
+    }
+  }
+  if (bestNN) {
+    const label = nieceNephewLabel(bestNN.k);
+    return { label, class: 'collateral', meta: { viaAncestor: bestNN.anc, stepsUp: bestNN.k, kind: 'niece-nephew' } };
+  }
+
+  // Cousins via explicit sibling links between ancestors
+  // If some ancestor of A is an explicit sibling of some ancestor of B, treat as cousins
+  // Approximate MRCA at one generation above those sibling-ancestors.
+  let bestCousin = null; // { ancA, kA, ancB, kB, degree, removal, cost }
+  for (const [ancA, kA] of upA2) {
+    if (kA < 1) continue;
+    const sibsA = siblingsOf.get(ancA) || new Set();
+    if (!sibsA.size) continue;
+    for (const [ancB, kB] of upB2) {
+      if (kB < 1) continue;
+      if (sibsA.has(ancB)) {
+        // Effective distances to inferred MRCA are (kA+1) and (kB+1)
+        const effA = kA + 1;
+        const effB = kB + 1;
+        const degree = Math.min(effA, effB) - 1;
+        const removal = Math.abs(effA - effB);
+        const cost = effA + effB; // prefer closer common ancestry
+        if (degree >= 1) {
+          if (!bestCousin || cost < bestCousin.cost || (cost === bestCousin.cost && removal < bestCousin.removal)) {
+            bestCousin = { ancA, kA, ancB, kB, degree, removal, cost };
+          }
+        }
+      }
+    }
+  }
+  if (bestCousin) {
+    const ord = ordinalForDegree(bestCousin.degree);
+    const label = bestCousin.removal === 0 ? `${ord} cousin` : `${ord} cousin ${removalLabel(bestCousin.removal)}`;
+    return { label, class: 'collateral', meta: { viaAncestors: [bestCousin.ancA, bestCousin.ancB], stepsUpA: bestCousin.kA, stepsUpB: bestCousin.kB, degree: bestCousin.degree, removal: bestCousin.removal } };
+  }
+
   // MRCA for collateral relations (aunt/uncle/niece/nephew/cousins)
   const mrca = findMRCA(a, b, parentsOf, depthLimit);
   if (!mrca) {
@@ -215,6 +275,20 @@ function removalLabel(rem) {
   if (rem === 1) return 'once removed';
   if (rem === 2) return 'twice removed';
   return `${rem} times removed`;
+}
+
+// Generate aunt/uncle style labels based on ancestor distance k (1 => aunt/uncle, 2 => grand-aunt/uncle, 3+ => great-...grand-aunt/uncle)
+function auntUncleLabel(k) {
+  if (k <= 1) return 'aunt/uncle';
+  if (k === 2) return 'grand-aunt/uncle';
+  return `${'great-'.repeat(k - 2)}grand-aunt/uncle`;
+}
+
+// Generate niece/nephew labels based on ancestor distance k (1 => niece/nephew, 2 => grand-niece/nephew, 3+ => great-...grand-niece/nephew)
+function nieceNephewLabel(k) {
+  if (k <= 1) return 'niece/nephew';
+  if (k === 2) return 'grand-niece/nephew';
+  return `${'great-'.repeat(k - 2)}grand-niece/nephew`;
 }
 
 // -------- affinal & step overlays --------
