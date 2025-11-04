@@ -474,6 +474,24 @@ export default function TreeBoard({
     }
   }, [rfInstance, onDropMember]);
 
+  // Auto-fit view on first load so the initial viewport matches the effect of clicking the "Fit view" control.
+  const didAutoFitRef = useRef(false);
+  useEffect(() => {
+    if (didAutoFitRef.current) return;
+    if (!rfInstance) return;
+    if (!Array.isArray(nodes) || nodes.length === 0) return;
+    // Allow React Flow to finish any layout/measuring before calling fitView
+    const t = setTimeout(() => {
+      try {
+        rfInstance.fitView?.({ padding: 0.1 });
+      } catch (err) {
+        // ignore
+      }
+      didAutoFitRef.current = true;
+    }, 150);
+    return () => clearTimeout(t);
+  }, [rfInstance, nodes]);
+
   useEffect(() => {
     if (maximized) return;
     const onKey = (e) => {
