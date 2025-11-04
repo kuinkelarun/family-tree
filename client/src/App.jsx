@@ -764,12 +764,40 @@ function App() {
     // Use original logical direction for edit operations (from = data.from, to = data.to)
     const logicalFrom = edge?.data?.from || edge?.source;
     const logicalTo = edge?.data?.to || edge?.target;
-    setEdgeEditor({ open: true, source: logicalFrom, target: logicalTo, type, label, x: e.clientX, y: e.clientY });
+    // include original edge reference so update/delete can special-case marriage->child edges
+    setEdgeEditor({ open: true, source: logicalFrom, target: logicalTo, type, label, x: e.clientX, y: e.clientY, originalEdge: edge });
   }
   async function updateEdge(editor, newType, newLabel) {
     try {
+      // Special-case: if the original edge was from a marriage point, update both parents' relationships
+      const orig = editor.originalEdge;
+      if (orig && String(orig.source || '').startsWith('m-')) {
+        // find marriage node to get parents
+        const marriageNode = nodes.find(n => String(n.id) === String(orig.source));
+        const parents = marriageNode?.data?.parents || [];
+        if (!parents.length) {
+          showToast('No parents found for marriage point');
+        } else {
+          const ops = [];
+          for (const pid of parents) {
+            // find existing relationship type for this parent->child, fallback to 'child'
+            const parentMember = members.find(m => String(m._id) === String(pid));
+            const rel = (parentMember?.relationships || []).find(r => String((r.relative && r.relative._id) || r.relative) === String(editor.target));
+            const existingType = rel?.type || 'child';
+            // We lock type for marriage->child edges; only update label across parents
+            ops.push(Relationships.update({ fromMemberId: pid, toMemberId: editor.target, type: existingType, newType: existingType, label: newLabel }));
+          }
+          await Promise.all(ops);
+          setEdgeEditor({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0, originalEdge: null });
+          await loadTree(treeId);
+          showToast('Relationship label updated for parents');
+        }
+        return;
+      }
+
+      // Default single-edge update
       await Relationships.update({ fromMemberId: editor.source, toMemberId: editor.target, type: editor.type, newType, label: newLabel });
-      setEdgeEditor({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0 });
+      setEdgeEditor({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0, originalEdge: null });
       await loadTree(treeId);
       showToast('Relationship updated');
     } catch (e) {
@@ -778,8 +806,54 @@ function App() {
   }
   async function deleteEdge(editor) {
     try {
+      const orig = editor.originalEdge;
+      if (orig && String(orig.source || '').startsWith('m-')) {
+        // delete both parents' relationships to the child sequentially to avoid
+        // concurrent-modification/version conflicts on member documents.
+        const marriageNode = nodes.find(n => String(n.id) === String(orig.source));
+        const parents = marriageNode?.data?.parents || [];
+        if (!parents.length) {
+          showToast('No parents found for marriage point');
+        } else {
+          for (const pid of parents) {
+            try {
+              const parentMember = members.find(m => String(m._id) === String(pid));
+              const rel = (parentMember?.relationships || []).find(r => String((r.relative && r.relative._id) || r.relative) === String(editor.target));
+              const existingType = rel?.type || 'child';
+              if (!rel) {
+                // nothing to delete for this parent
+                continue;
+              }
+              await Relationships.remove({ fromMemberId: pid, toMemberId: editor.target, type: existingType });
+            } catch (e) {
+              // If we hit a 'No matching document' / version conflict, try refreshing the tree
+              // and attempt to remove again for this parent once.
+              const msg = (e && e.message) || String(e || '');
+              if (msg.includes('No matching document') || msg.includes('version')) {
+                try {
+                  await loadTree(treeId);
+                  // re-resolve parent and relationship after reload
+                  const parentMember2 = members.find(m => String(m._id) === String(pid));
+                  const rel2 = (parentMember2?.relationships || []).find(r => String((r.relative && r.relative._id) || r.relative) === String(editor.target));
+                  const existingType2 = rel2?.type || 'child';
+                  if (rel2) await Relationships.remove({ fromMemberId: pid, toMemberId: editor.target, type: existingType2 });
+                } catch (err2) {
+                  console.error('[deleteEdge] retry delete failed for parent', pid, err2);
+                }
+              } else {
+                console.error('[deleteEdge] remove failed for parent', pid, e);
+              }
+            }
+          }
+          setEdgeEditor({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0, originalEdge: null });
+          await loadTree(treeId);
+          showToast('Relationship(s) deleted');
+        }
+        return;
+      }
+
       await Relationships.remove({ fromMemberId: editor.source, toMemberId: editor.target, type: editor.type });
-      setEdgeEditor({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0 });
+      setEdgeEditor({ open: false, source: '', target: '', type: 'custom', label: '', x: 0, y: 0, originalEdge: null });
       await loadTree(treeId);
       showToast('Relationship deleted');
     } catch (e) {
@@ -975,6 +1049,7 @@ function App() {
             y={edgeEditor.y}
             type={edgeEditor.type}
             label={edgeEditor.label || ''}
+            allowTypeChange={!String(edgeEditor?.originalEdge?.source || '').startsWith('m-')}
             onUpdate={(newType, newLabel) => updateEdge(edgeEditor, newType, newLabel)}
             onDelete={() => deleteEdge(edgeEditor)}
             onClose={cancelEdgeEdit}

@@ -8,7 +8,7 @@ import React, { useEffect, useRef, useState } from 'react';
 // - onUpdate(newType, newLabel)
 // - onDelete()
 // - onClose()
-export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label = '', onUpdate, onDelete, onClose }) {
+export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label = '', allowTypeChange = true, onUpdate, onDelete, onClose }) {
   const ref = useRef(null);
   const [localType, setLocalType] = useState(type);
   const [localLabel, setLocalLabel] = useState(label || '');
@@ -79,6 +79,7 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
               value={localType}
               onChange={(e) => setLocalType(e.target.value)}
               style={{ width: '100%', marginTop: 4, padding: 6, boxSizing: 'border-box', fontSize: 12 }}
+              disabled={!allowTypeChange}
             >
               <option value="parent">parent</option>
               <option value="child">child</option>
@@ -86,6 +87,7 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
               <option value="sibling">sibling</option>
               <option value="custom">custom</option>
             </select>
+            {!allowTypeChange && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>Type locked for this edge</div>}
           </label>
           <label style={{ fontSize: 11, color: '#334155', display: 'block' }}>
             Label (optional)
