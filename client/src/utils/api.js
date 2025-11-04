@@ -51,6 +51,14 @@ export const Trees = {
   async get(id) { return api(`/api/trees/${id}`); },
   async delete(id) { return api(`/api/trees/${id}`, { method: 'DELETE' }); },
   async updateMarriagePoint(id, payload) { return api(`/api/trees/${id}/marriage-points`, { method: 'PUT', body: payload }); },
+  async kinship(id, from, to, depth = 10) {
+    const q = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&depth=${encodeURIComponent(depth)}`;
+    return api(`/api/trees/${id}/kinship?${q}`);
+  },
+  async kinshipMap(id, memberId, depth = 8) {
+    const q = `depth=${encodeURIComponent(depth)}`;
+    return api(`/api/trees/${id}/kinship/${encodeURIComponent(memberId)}?${q}`);
+  },
 };
 
 export const Members = {

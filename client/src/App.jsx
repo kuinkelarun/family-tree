@@ -6,6 +6,7 @@ import MemberModal from './components/MemberModal.jsx';
 import RelationshipPicker from './components/RelationshipPicker.jsx';
 import EdgeEditorPopover from './components/EdgeEditorPopover.jsx';
 import AdminRecomputeJobs from './components/AdminRecomputeJobs.jsx';
+import KinshipPanel from './components/KinshipPanel.jsx';
 import { api, Auth, Trees, Members, Relationships, Users, getToken, setToken, getTreeId, setTreeId } from './utils/api.js';
 import * as htmlToImage from 'html-to-image';
 
@@ -35,6 +36,7 @@ function App() {
   const [members, setMembers] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [treeMeta, setTreeMeta] = useState(null);
+  const [showKinship, setShowKinship] = useState(false);
 
   async function checkApi() {
     try {
@@ -1100,6 +1102,7 @@ function App() {
                   <button onClick={handleDeleteTree} title="Permanently delete this tree" style={{ padding: '6px 10px', borderRadius: 6, background: '#dc2626', color: '#fff', border: 'none' }}>Delete Tree</button>
                 )}
                 <button title="Refresh list" onClick={loadMyTrees} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1' }}>↻</button>
+                <button onClick={() => setShowKinship(true)} disabled={!treeId || !members.length} style={{ padding: '6px 10px', borderRadius: 6, background: (treeId && members.length) ? '#6b7280' : '#94a3b8', color: '#fff', border: 'none' }}>Kinship</button>
                 <button onClick={handleExportPng} disabled={!nodes.length} style={{ padding: '6px 10px', borderRadius: 6, background: nodes.length ? '#0ea5e9' : '#94a3b8', color: '#fff', border: 'none' }}>Export PNG</button>
                 <button onClick={handleLogout} style={{ padding: '6px 10px', borderRadius: 6, background: '#ef4444', color: '#fff', border: 'none' }}>Logout</button>
               </>
@@ -1208,6 +1211,15 @@ function App() {
         )}
         {showAdminPanel && (
           <AdminRecomputeJobs onClose={() => { window.location.hash = ''; setShowAdminPanel(false); }} />
+        )}
+        {showKinship && (
+          <KinshipPanel
+            open={showKinship}
+            onClose={() => setShowKinship(false)}
+            members={members}
+            treeId={treeId}
+            canQuery={!!(token && treeId)}
+          />
         )}
         {/* Keep showAdminPanel in sync with URL hash so admin page is a route */}
         <script dangerouslySetInnerHTML={{ __html: `
