@@ -38,7 +38,9 @@ const MemberSchema = new mongoose.Schema(
     photo: { type: String },
   location: { type: String },
     position: { type: PositionSchema, default: null },
-    relationships: { type: [RelationshipSchema], default: [] },
+  relationships: { type: [RelationshipSchema], default: [] },
+  // Generation level for hierarchical layout (1 = root / oldest generation)
+  generation: { type: Number, default: 1, index: true },
     notes: { type: String },
     occupation: { type: String },
     events: { type: [EventSchema], default: [] },

@@ -27,6 +27,7 @@ import memberRoutes from './routes/members.js';
 import relationshipRoutes from './routes/relationships.js';
 import aiRoutes from './routes/ai.js';
 import uploadRoutes from './routes/uploads.js';
+import adminRoutes from './routes/admin.js';
 
 // Load env from server/.env first, then project-root custom env files as fallback
 const __filename = fileURLToPath(import.meta.url);
@@ -96,6 +97,7 @@ app.use('/api/members', memberRoutes);
 app.use('/api/relationships', relationshipRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/uploads', uploadRoutes);
+app.use('/api/admin', adminRoutes);
 
 const PORT = process.env.PORT || 4000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/family_tree';
@@ -103,11 +105,31 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/family_tre
 // Start server regardless of DB connectivity so /health is reachable during local setup
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
 
-mongoose
-  .connect(MONGO_URI)
-  .then(() => {
-    console.log('Mongo connected');
-  })
-  .catch((err) => {
-    console.error('Mongo connection error:', err.message);
-  });
+// Connect to MongoDB with retry/backoff logic to handle transient network issues.
+async function connectWithRetry() {
+  const maxRetries = parseInt(process.env.MONGO_RETRY_MAX || '10', 10);
+  const baseDelay = parseInt(process.env.MONGO_RETRY_BASE_MS || '1000', 10); // 1s
+  let attempt = 0;
+  while (true) {
+    try {
+      await mongoose.connect(MONGO_URI);
+      console.log('Mongo connected');
+      break;
+    } catch (err) {
+      attempt += 1;
+      lastDbError = err?.message || String(err);
+      console.error(`Mongo connection attempt ${attempt} failed:`, lastDbError);
+      if (attempt >= maxRetries) {
+        console.error(`Mongo connection failed after ${attempt} attempts. Giving up.`);
+        break;
+      }
+      const delay = baseDelay * Math.pow(2, attempt - 1);
+      console.log(`Retrying Mongo connection in ${delay}ms...`);
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
+// Start the connect attempts in background
+connectWithRetry();

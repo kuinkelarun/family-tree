@@ -6,8 +6,9 @@ import { ensureDbReady } from '../middleware/dbReady.js';
 const router = Router();
 
 router.get('/me', ensureDbReady, requireAuth, async (req, res) => {
-  const user = await User.findById(req.user.id).select('_id email');
-  res.json(user);
+  // Include roles for client-side RBAC checks
+  const user = await User.findById(req.user.id).select('_id email roles');
+  res.json(user || {});
 });
 
 export default router;

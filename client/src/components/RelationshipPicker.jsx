@@ -12,6 +12,24 @@ export default function RelationshipPicker({
 }) {
   const [type, setType] = useState(defaultType);
   const [label, setLabel] = useState(defaultLabel);
+  const [labelEdited, setLabelEdited] = useState(false);
+
+  // Sync local state when the picker is opened or when defaults change.
+  // Do not assume an incoming defaultLabel means the user has manually edited it —
+  // allow auto-updating when the type changes unless the user interacts with the label input.
+  useEffect(() => {
+    setType(defaultType);
+    setLabel(defaultLabel || (defaultType !== 'custom' ? defaultType : ''));
+    setLabelEdited(false);
+  }, [open, defaultType, defaultLabel]);
+
+  // When the user switches the type, auto-update the label to match the type
+  // unless they've manually edited the label.
+  useEffect(() => {
+    if (!labelEdited) {
+      setLabel(type === 'custom' ? '' : type);
+    }
+  }, [type, labelEdited]);
 
   useEffect(() => {
     if (!open) return; // don't register when closed
@@ -34,9 +52,7 @@ export default function RelationshipPicker({
             <option value="sibling">sibling</option>
             <option value="custom">custom</option>
           </select>
-          {type === 'custom' && (
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="custom label (optional)" style={{ padding: 8 }} />
-          )}
+          <input value={label} onChange={(e) => { setLabel(e.target.value); setLabelEdited(true); }} placeholder="optional label (leave blank to use type)" style={{ padding: 8 }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 16 }}>
           {onDelete ? (

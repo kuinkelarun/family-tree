@@ -7,6 +7,10 @@ export default function Sidebar({
   onSelectMember,
   onDeleteMember,
   onAddNewMember,
+  currentUser,
+  onOpenAdmin,
+  canAddMember = false,
+  showToast,
 }) {
   // Members that are NOT yet on canvas
   const membersNotOnCanvas = members.filter(m => !nodesOnCanvas.includes(m._id));
@@ -22,7 +26,12 @@ export default function Sidebar({
 
   return (
     <aside style={{ width: 240, padding: 16, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <h2 style={{ marginTop: 0, fontSize: 20, color: '#111827' }}>Family Tree</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h2 style={{ marginTop: 0, fontSize: 20, color: '#111827', margin: 0 }}>Family Tree</h2>
+        {currentUser && Array.isArray(currentUser.roles) && currentUser.roles.includes('admin') && (
+          <button onClick={() => onOpenAdmin?.()} title="Admin" style={{ marginLeft: 'auto', padding: '4px 8px', borderRadius: 6, background: '#111827', color: '#fff', border: 'none' }}>Admin</button>
+        )}
+      </div>
       {/* Left pane control area intentionally minimal for production: no debug controls */}
       
       <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
@@ -36,8 +45,12 @@ export default function Sidebar({
           </strong>
           <div style={{ marginTop: 8, marginBottom: 8 }}>
             <button
-              onClick={() => onAddNewMember?.()}
-              style={{ padding: '6px 10px', borderRadius: 6, background: '#2563eb', color: '#fff', border: 'none' }}
+              onClick={() => { if (canAddMember) { onAddNewMember?.(); } else { showToast ? showToast('Create or select a tree to add members.') : null; } }}
+              // Use aria-disabled instead of disabled so we can still show a toast when clicked.
+              aria-disabled={!canAddMember}
+              tabIndex={canAddMember ? 0 : -1}
+              title={!canAddMember ? 'Create or select a tree to add members.' : 'Add a new member to this tree'}
+              style={{ padding: '6px 10px', borderRadius: 6, background: canAddMember ? '#2563eb' : '#c7d2fe', color: '#fff', border: 'none', cursor: canAddMember ? 'pointer' : 'not-allowed' }}
             >
               + Add New Member
             </button>

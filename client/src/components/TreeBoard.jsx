@@ -516,11 +516,11 @@ export default function TreeBoard({
         {/* Right-aligned, responsive legend: items will wrap on small widths */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 11, color: '#64748b', justifyContent: 'flex-end', flexWrap: 'wrap', minWidth: 0, maxWidth: '48%' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 2, background: '#10b981', borderRadius: 1 }}></div>
+            <div style={{ width: 14, height: 2, background: '#f97316', borderRadius: 1 }}></div>
             parent
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 2, background: '#10b981', borderRadius: 1 }}></div>
+            <div style={{ width: 14, height: 2, background: '#f97316', borderRadius: 1 }}></div>
             child
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -528,7 +528,7 @@ export default function TreeBoard({
             spouse
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 2, background: '#f97316', borderRadius: 1 }}></div>
+            <div style={{ width: 14, height: 2, background: '#10b981', borderRadius: 1 }}></div>
             sibling
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

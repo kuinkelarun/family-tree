@@ -131,6 +131,9 @@ function buildEnhancedEdges(members, graph) {
             type: 'spouse', 
             label: 'spouse',
             renderStyle: 'horizontal',
+            // Do not bundle spouse edges — show label on each spouse edge so it's clear when
+            // multiple spouses exist for a node.
+            bundle: false,
           },
         });
         createdEdges.add(spouseEdgeId);
@@ -235,6 +238,9 @@ function buildEnhancedEdges(members, graph) {
           data: {
             type,
             label: rel.label || type,
+            // For spouse/sibling relationships, prefer showing labels on each edge
+            // to avoid random hiding when edges are bundled together.
+            ...(type === 'spouse' || type === 'sibling' ? { bundle: false } : {}),
           },
         });
         createdEdges.add(edgeId);

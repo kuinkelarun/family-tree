@@ -1,6 +1,9 @@
 import FamilyTree from '../models/FamilyTree.js';
 import Member from '../models/Member.js';
 import { treeSchema } from '../utils/validate.js';
+import { recomputeGenerationsForTree } from '../utils/generation.js';
+import { enqueueRecompute } from '../utils/recomputeQueue.js';
+import { startWorker } from '../utils/recomputeQueue.js';
 
 export async function createTree(req, res) {
   try {
@@ -89,4 +92,37 @@ export async function updateMarriagePoint(req, res) {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+}
+
+export async function recomputeGenerations(req, res) {
+  try {
+    const treeId = req.params.id;
+    const tree = await FamilyTree.findById(treeId);
+    if (!tree) return res.status(404).json({ error: 'Not found' });
+    const allowed = String(tree.owner) === String(req.user.id) ||
+      tree.permissions?.some((p) => String(p.user) === String(req.user.id) && p.access !== 'viewer');
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+
+    try {
+      const result = await recomputeGenerationsForTree(treeId);
+      if (result && result.ok) return res.json({ ok: true, updated: result.updated });
+      // If recompute reported failure, enqueue and return accepted
+      enqueueRecompute(treeId);
+      return res.status(202).json({ ok: false, message: 'Recompute enqueued for background retry' });
+    } catch (e) {
+      console.error('[treeController.recomputeGenerations] recompute failed', e);
+      enqueueRecompute(treeId);
+      return res.status(202).json({ ok: false, message: 'Recompute enqueued for background retry' });
+    }
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+// Start the background worker when treeController is loaded (ensures it's started once)
+try {
+  startWorker();
+  console.log('[treeController] recompute worker started');
+} catch (e) {
+  console.error('[treeController] failed to start recompute worker', e);
 }

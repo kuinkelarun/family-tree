@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import { requireAuth } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/admin.js';
+import { getRecomputeQueue, postForceRetry, postRemoveJob } from '../controllers/adminController.js';
+
+const router = Router();
+
+// Admin endpoints - require auth + admin role (ADMIN_EMAILS env controls allowed emails)
+router.get('/recompute-queue', requireAuth, requireAdmin, getRecomputeQueue);
+router.post('/recompute-queue/:jobId/retry', requireAuth, requireAdmin, postForceRetry);
+router.delete('/recompute-queue/:jobId', requireAuth, requireAdmin, postRemoveJob);
+
+export default router;

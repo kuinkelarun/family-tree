@@ -12,6 +12,8 @@ const UserSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, index: true },
     password: { type: String, required: true },
+    // Roles allow role-based access checks (e.g. ['admin'])
+    roles: [{ type: String }],
     trees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FamilyTree' }],
     permissions: [PermissionSchema],
   },

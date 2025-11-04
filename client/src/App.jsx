@@ -5,6 +5,7 @@ import TreeBoard from './components/TreeBoard.jsx';
 import MemberModal from './components/MemberModal.jsx';
 import RelationshipPicker from './components/RelationshipPicker.jsx';
 import EdgeEditorPopover from './components/EdgeEditorPopover.jsx';
+import AdminRecomputeJobs from './components/AdminRecomputeJobs.jsx';
 import { api, Auth, Trees, Members, Relationships, Users, getToken, setToken, getTreeId, setTreeId } from './utils/api.js';
 import * as htmlToImage from 'html-to-image';
 
@@ -12,19 +13,22 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 // Color coding for relationship types
 const RELATIONSHIP_COLORS = {
-  parent: '#10b981',    // emerald-500 (green) - parent to child
-  child: '#10b981',     // emerald-500 (same as parent)
+  parent: '#f97316',    // orange-500 (was sibling) - parent to child
+  child: '#f97316',     // orange-500 (same as parent)
   spouse: '#ec4899',    // pink-500 (romantic)
-  sibling: '#f97316',   // orange-500 (sibling bond)
+  sibling: '#10b981',   // emerald-500 (was parent) - sibling bond
   custom: '#8b5cf6',    // violet-500 (custom/other)
 };
+
+// (generation-based auto-arrange removed)
 
 function App() {
   const [apiStatus, setApiStatus] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [token, setTokenState] = useState(getToken());
+  const [token, setTokenState] = useState(getToken() || '');
   const [currentUser, setCurrentUser] = useState(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(window.location.hash === '#/admin');
   const [treeId, setTreeIdState] = useState(getTreeId());
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -69,6 +73,9 @@ function App() {
     setTreeIdState('');
     setNodes([]);
     setEdges([]);
+    setMembers([]);
+    setMyTrees([]);
+    setTreeMeta(null);
     setTreeId('');
   }
 
@@ -96,6 +103,25 @@ function App() {
     }
   }
 
+  function clearSelectedTreeState() {
+    setTreeIdState('');
+    setTreeId('');
+    setNodes([]);
+    setEdges([]);
+    setMembers([]);
+    setTreeMeta(null);
+  }
+
+  function handleSelectTree(id) {
+    if (!id) {
+      clearSelectedTreeState();
+      return;
+    }
+    setTreeIdState(id);
+    setTreeId(id);
+    loadTree(id).catch(() => {});
+  }
+
   function hasPosVal(pos) {
     return pos && typeof pos.x === 'number' && typeof pos.y === 'number';
   }
@@ -112,19 +138,20 @@ function App() {
     // 1. Create nodes for all members on the canvas.
     // If a member has a saved position, use it. Otherwise prefer the current UI node position
     // (so transient UI drags are preserved across a reload), and fallback to a sensible grid.
-    const personNodes = members.map((m, idx) => {
-      const savedPos = hasPosVal(m.position) ? { x: m.position.x, y: m.position.y } : null;
-      // If the app already has this node in the current UI state, prefer that position when savedPos is missing.
-      const uiNode = nodes?.find?.(n => String(n.id) === String(m._id));
-      const uiPos = uiNode && uiNode.position && typeof uiNode.position.x === 'number' && typeof uiNode.position.y === 'number' ? { x: uiNode.position.x, y: uiNode.position.y } : null;
-      const pos = savedPos || uiPos || fallbackPosForIndex(idx);
-      return {
+    const personNodes = [];
+    for (let idx = 0; idx < members.length; idx++) {
+      const m = members[idx];
+      // Only render members that have a persisted position (i.e., are on the canvas).
+      // Members with no saved position belong to the Member Pool and should not be shown here.
+      if (!hasPosVal(m.position)) continue;
+      const pos = { x: m.position.x, y: m.position.y };
+      personNodes.push({
         id: m._id,
         data: { label: m.name || `Member ${idx + 1}` },
         position: pos,
         type: 'familyNode',
-      };
-    });
+      });
+    }
 
     const allNodes = [...personNodes];
     const allEdges = [];
@@ -230,6 +257,7 @@ function App() {
           target: p2Id,
           type: 'smoothstep',
           label: 'spouse',
+          data: { type: 'spouse', bundle: false },
           sourceHandle: isP2Right ? 'right-source' : 'left-source',
           targetHandle: isP2Right ? 'left-target' : 'right-target',
           labelStyle: { fill: '#111827', fontSize: 12, fontWeight: 600 },
@@ -751,6 +779,19 @@ function App() {
     }
   }, [token, treeId]);
 
+  // Expose a small hash-based router for the admin page so the admin UI is reachable at #/admin
+  useEffect(() => {
+    window.__app_setShowAdmin = setShowAdminPanel;
+    const onHash = () => setShowAdminPanel(window.location.hash === '#/admin');
+    window.addEventListener('hashchange', onHash);
+    // initialize from current hash
+    onHash();
+    return () => {
+      window.removeEventListener('hashchange', onHash);
+      try { delete window.__app_setShowAdmin; } catch (e) {}
+    };
+  }, []);
+
   // Toasts
   const [toast, setToast] = useState('');
   function showToast(msg) {
@@ -778,7 +819,58 @@ function App() {
     }
 
     const type = edge?.data?.type || (String(edge?.id || '').split('-').pop() || 'custom');
-    const label = edge?.data?.label || edge?.label || '';
+    // Resolve the authoritative saved label for this logical relationship by
+    // looking up the member.relationships entries in memory. Edge objects in the
+    // renderer can be derived or bundled and may not include the persisted label.
+    let label = '';
+    try {
+      const logicalFrom = edge?.data?.from || edge?.source;
+      const logicalTo = edge?.data?.to || edge?.target;
+
+      // Helper to normalize id strings
+      const normalize = (v) => (v == null ? '' : String(v));
+      const fromId = normalize(logicalFrom);
+      const toId = normalize(logicalTo);
+
+      // 1) Check relationships on the fromMember pointing to the toMember
+      const fromMember = members.find(m => normalize(m._id) === fromId);
+      if (fromMember) {
+        const rel = (fromMember.relationships || []).find(r => normalize((r.relative && r.relative._id) || r.relative) === toId);
+        if (rel && rel.label) label = rel.label;
+      }
+
+      // 2) If not found, check relationships on the toMember pointing to the fromMember
+      if (!label) {
+        const toMember = members.find(m => normalize(m._id) === toId);
+        if (toMember) {
+          const rel2 = (toMember.relationships || []).find(r => normalize((r.relative && r.relative._id) || r.relative) === fromId);
+          if (rel2 && rel2.label) label = rel2.label;
+        }
+      }
+
+      // 3) As a last resort, scan all members for any relationship record between the two ids
+      if (!label) {
+        for (const m of members) {
+          const rel = (m.relationships || []).find(r => {
+            const rid = normalize((r.relative && r.relative._id) || r.relative);
+            return (rid === fromId && normalize(m._id) === toId) || (rid === toId && normalize(m._id) === fromId);
+          });
+          if (rel && rel.label) { label = rel.label; break; }
+        }
+      }
+    } catch (err) {
+      // ignore lookup errors and fallback below
+    }
+    if (!label) label = edge?.data?.label || edge?.label || '';
+
+    // Debug logging to help trace label resolution when the editor opens.
+    try {
+      console.debug('[handleEdgeClick] edge:', edge);
+      console.debug('[handleEdgeClick] resolved logicalFrom/to:', { logicalFrom: edge?.data?.from || edge?.source, logicalTo: edge?.data?.to || edge?.target });
+      console.debug('[handleEdgeClick] lookup result labels:', { fromMemberLabel: (members.find(m => String(m._id) === String(edge?.data?.from || edge?.source))?.relationships || []).map(r => ({ type: r.type, label: r.label, relative: r.relative })) , finalLabel: label });
+    } catch (err) {
+      // swallow logging errors
+    }
     // Use original logical direction for edit operations (from = data.from, to = data.to)
     const logicalFrom = edge?.data?.from || edge?.source;
     const logicalTo = edge?.data?.to || edge?.target;
@@ -984,6 +1076,10 @@ function App() {
         onSelectMember={(id) => { setSelectedId(id); setModalOpen(true); }}
         onDeleteMember={canEdit ? handleDeleteMember : undefined}
         onAddNewMember={openNewMemberModal}
+        currentUser={currentUser}
+        onOpenAdmin={() => { window.location.hash = '#/admin'; }}
+        canAddMember={!!(isAuthed && treeId && canEdit)}
+        showToast={showToast}
       />
       <main style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -994,7 +1090,7 @@ function App() {
               <>
                 <span style={{ color: '#1f2937', fontSize: 12 }}>{currentUser?.email}</span>
                 <button onClick={handleCreateTree} style={{ padding: '6px 10px', borderRadius: 6, background: '#16a34a', color: '#fff', border: 'none' }}>Create Tree</button>
-                <select value={treeId || ''} onChange={(e) => { const id = e.target.value; setTreeIdState(id); setTreeId(id); if (id) loadTree(id); }} style={{ padding: 6 }}>
+                <select value={treeId || ''} onChange={(e) => { const id = e.target.value; handleSelectTree(id); }} style={{ padding: 6 }}>
                   <option value="">Select a tree…</option>
                   {myTrees.map((t) => (
                     <option key={t._id} value={t._id}>{t.title}</option>
@@ -1110,6 +1206,17 @@ function App() {
             {toast}
           </div>
         )}
+        {showAdminPanel && (
+          <AdminRecomputeJobs onClose={() => { window.location.hash = ''; setShowAdminPanel(false); }} />
+        )}
+        {/* Keep showAdminPanel in sync with URL hash so admin page is a route */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            window.addEventListener('hashchange', function(){
+              try{ if(window.location.hash === '#/admin') { window.__app_setShowAdmin && window.__app_setShowAdmin(true); } else { window.__app_setShowAdmin && window.__app_setShowAdmin(false); }}catch(e){}
+            });
+          })();
+        ` }} />
         
       </main>
     </div>

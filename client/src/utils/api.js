@@ -80,3 +80,17 @@ export const Relationships = {
 export const Users = {
   async me() { return api('/api/users/me'); },
 };
+
+export const Admin = {
+  async listRecomputeJobs({ page, limit, status, treeId } = {}) {
+    const qs = [];
+    if (page) qs.push(`page=${encodeURIComponent(page)}`);
+    if (limit) qs.push(`limit=${encodeURIComponent(limit)}`);
+    if (status) qs.push(`status=${encodeURIComponent(status)}`);
+    if (treeId) qs.push(`treeId=${encodeURIComponent(treeId)}`);
+    const q = qs.length ? `?${qs.join('&')}` : '';
+    return api(`/api/admin/recompute-queue${q}`);
+  },
+  async forceRetryJob(jobId) { return api(`/api/admin/recompute-queue/${encodeURIComponent(jobId)}/retry`, { method: 'POST' }); },
+  async removeJob(jobId) { return api(`/api/admin/recompute-queue/${encodeURIComponent(jobId)}`, { method: 'DELETE' }); },
+};

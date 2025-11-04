@@ -15,10 +15,14 @@ export default function FamilyEdge({
   targetPosition,
   style = {},
   data = {},
+  label: topLabel = '',
   markerEnd,
   selected,
 }) {
-  const { type, label, virtual, renderStyle, fromMarriagePoint } = data;
+  const { type, label: dataLabel, virtual, renderStyle, fromMarriagePoint, bundleMember } = data;
+  // Respect bundleMember flag (visual-only) which indicates this edge should hide its label.
+  // Choose label from data first (preferred), fall back to the top-level edge label prop, then to the type for non-custom relationships.
+  const effectiveLabel = bundleMember ? '' : (typeof dataLabel === 'string' && dataLabel.length ? dataLabel : (typeof topLabel === 'string' && topLabel.length ? topLabel : (type && type !== 'custom' ? type : '')));
 
   // Choose rendering strategy based on edge type
   let edgePath, labelX, labelY;
@@ -78,11 +82,11 @@ export default function FamilyEdge({
         markerEnd={markerEndStyle} 
         style={edgeStyle} 
       />
-      {label && !virtual && (
+      {effectiveLabel && !virtual && (
         <EdgeLabel 
           x={labelX} 
           y={labelY} 
-          label={label}
+          label={effectiveLabel}
           color={edgeColor}
           selected={selected}
         />
@@ -119,10 +123,10 @@ function getStraightPath(sx, sy, tx, ty) {
  */
 function getEdgeColor(type) {
   const colors = {
-    parent: '#10b981',      // emerald-500 (green)
-    child: '#10b981',       // same as parent
+    parent: '#f97316',      // orange-500 (parent/child swapped)
+    child: '#f97316',       // same as parent
     spouse: '#ec4899',      // pink-500 (romantic)
-    sibling: '#f97316',     // orange-500 (sibling bond)
+    sibling: '#10b981',     // emerald-500 (sibling bond swapped)
     custom: '#8b5cf6',      // violet-500 (custom/other)
     'parent-connector': '#94a3b8', // gray for virtual
   };

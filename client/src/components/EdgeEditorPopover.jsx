@@ -12,14 +12,19 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
   const ref = useRef(null);
   const [localType, setLocalType] = useState(type);
   const [localLabel, setLocalLabel] = useState(label || '');
-  const [labelEdited, setLabelEdited] = useState(Boolean(label));
+  // Treat incoming label as a starting value but not as "user edited" —
+  // we only mark labelEdited = true when the user actively changes the input in this session.
+  const [labelEdited, setLabelEdited] = useState(false);
+  const initialMountRef = useRef(true);
 
   useEffect(() => {
-    // When incoming props change, update local state.
+    // When incoming props change, update local state but do not assume the incoming
+    // label was "manually edited" by the user in this session. Allow auto-labeling
+    // to overwrite the label when the type changes unless the user interacts with
+    // the label input (which will set labelEdited = true).
     setLocalType(type);
     setLocalLabel(label || '');
-    // If incoming label exists, treat it as user-edited; otherwise allow auto-labeling
-    setLabelEdited(Boolean(label));
+    setLabelEdited(false);
   }, [type, label]);
 
   useEffect(() => {
@@ -39,17 +44,9 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
     };
   }, [onClose]);
 
-  // Auto-update label when type changes, unless the user has manually edited the label.
-  useEffect(() => {
-    // On type change, automatically update the label to match the type (empty for custom)
-    // only if the user hasn't manually edited the label. If the user provided a custom
-    // label (labelEdited === true), preserve it.
-    if (!labelEdited) {
-      setLocalLabel(localType === 'custom' ? '' : localType);
-    }
-    // do not include localLabel or labelEdited in deps to avoid loop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localType]);
+  // Note: We intentionally avoid auto-updating the label in a useEffect tied to localType
+  // because that runs for both user-driven changes and prop syncs on open. Instead, we
+  // update the label only on user interaction in the onChange handler below.
 
   // Responsive clamping so the popover never renders out of the viewport
   const widthGuess = Math.min(320, Math.max(240, window.innerWidth - 16));
@@ -79,7 +76,16 @@ export default function EdgeEditorPopover({ x = 0, y = 0, type = 'custom', label
             Type
             <select
               value={localType}
-              onChange={(e) => setLocalType(e.target.value)}
+              onChange={(e) => {
+                const newType = e.target.value;
+                setLocalType(newType);
+                // Auto-update label when the user changes the type, unless they've manually
+                // edited the label input during this session. This avoids overwriting the
+                // incoming saved custom label on initial open.
+                if (!labelEdited) {
+                  setLocalLabel(newType === 'custom' ? '' : newType);
+                }
+              }}
               style={{ width: '100%', marginTop: 4, padding: 6, boxSizing: 'border-box', fontSize: 12 }}
               disabled={!allowTypeChange}
             >
