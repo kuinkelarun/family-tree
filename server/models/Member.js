@@ -34,6 +34,7 @@ const MemberSchema = new mongoose.Schema(
   {
     tree: { type: mongoose.Schema.Types.ObjectId, ref: 'FamilyTree', required: true, index: true },
     name: { type: String, required: true, index: true },
+    nickname: { type: String },
     dob: { type: Date },
     photo: { type: String },
   location: { type: String },

@@ -8,6 +8,7 @@ import EdgeEditorPopover from './components/EdgeEditorPopover.jsx';
 import AdminRecomputeJobs from './components/AdminRecomputeJobs.jsx';
 import KinshipPanel from './components/KinshipPanel.jsx';
 import { api, Auth, Trees, Members, Relationships, Users, getToken, setToken, getTreeId, setTreeId } from './utils/api.js';
+import { displayMemberName } from './utils/format.js';
 import * as htmlToImage from 'html-to-image';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
@@ -132,10 +133,75 @@ function App() {
     return { x: (idx % 6) * 180, y: Math.floor(idx / 6) * 140 };
   }
 
+  // Find the smallest available "Person N" name not already used across ALL members (canvas + pool)
+  function nextAvailablePersonName() {
+    const used = new Set();
+    for (const m of members) {
+      const nm = (m.name || '').trim();
+      const match = /^Person\s+(\d+)$/.exec(nm);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (Number.isFinite(n) && n > 0) used.add(n);
+      }
+    }
+    let candidate = 1;
+    while (used.has(candidate)) candidate++;
+    return `Person ${candidate}`;
+  }
+
+  // Given an arbitrary base name, return a unique variant across ALL members by appending " (k)" if needed
+  function uniqueNameAcrossApp(base, excludeId) {
+    const trimBase = String(base || '').trim();
+    if (!trimBase) return trimBase;
+    const names = new Set(
+      members
+        .filter(m => !excludeId || String(m._id) !== String(excludeId))
+        .map(m => (m.name || '').trim())
+    );
+    // If it's a Person N pattern, reuse the numeric generator to avoid odd suffixes
+    const personMatch = /^Person\s+(\d+)$/.exec(trimBase);
+    if (personMatch) {
+      // If 'Person N' is free, return it; else compute next available numeric "Person X"
+      if (!names.has(trimBase)) return trimBase;
+      return nextAvailablePersonName();
+    }
+    if (!names.has(trimBase)) return trimBase;
+    // Append (2), (3), ... until free
+    let k = 2;
+    let candidate = `${trimBase} (${k})`;
+    while (names.has(candidate)) {
+      k += 1;
+      candidate = `${trimBase} (${k})`;
+    }
+    return candidate;
+  }
+
   function mapTreeToGraph(tree) {
     const members = Array.isArray(tree.members) ? tree.members : [];
     const posById = new Map(members.map(m => [String(m._id), m.position || { x: 0, y: 0 }]));
     const membersById = new Map(members.map(m => [String(m._id), m]));
+
+    // Build disambiguated labels for members on the canvas when names collide
+    const onCanvasMembers = members.filter(m => hasPosVal(m.position));
+    const nameCounts = new Map();
+    for (const m of onCanvasMembers) {
+      const nm = (m.name || '').trim();
+      nameCounts.set(nm, (nameCounts.get(nm) || 0) + 1);
+    }
+    const labelById = new Map();
+    for (const m of onCanvasMembers) {
+      const nm = (m.name || '').trim();
+      if (!nm) { labelById.set(String(m._id), nm); continue; }
+      const count = nameCounts.get(nm) || 0;
+      if (count <= 1) {
+        // First/only member with this name: keep as-is
+        labelById.set(String(m._id), nm);
+      } else {
+        // Multiple members share this name: only use nickname to disambiguate.
+        const nick = (m.nickname || '').trim();
+        labelById.set(String(m._id), nick ? `${nm} (${nick})` : nm);
+      }
+    }
 
     // 1. Create nodes for all members on the canvas.
     // If a member has a saved position, use it. Otherwise prefer the current UI node position
@@ -149,7 +215,7 @@ function App() {
       const pos = { x: m.position.x, y: m.position.y };
       personNodes.push({
         id: m._id,
-        data: { label: m.name || `Member ${idx + 1}` },
+        data: { label: labelById.get(String(m._id)) || m.name || `Member ${idx + 1}` },
         position: pos,
         type: 'familyNode',
       });
@@ -509,8 +575,8 @@ function App() {
   async function handleAddPersonAt(position) {
     if (!treeId) return alert('Create a tree first.');
     try {
+      const name = nextAvailablePersonName();
       const idx = nodes.length;
-      const name = `Person ${idx + 1}`;
       const pos = position && typeof position.x === 'number' && typeof position.y === 'number'
         ? position
         : fallbackPosForIndex(idx);
@@ -530,8 +596,8 @@ function App() {
       console.log(`[handleAddMemberToCanvas] Adding member ${member._id} to canvas at position:`, position);
       // Update member with position - this adds them to canvas
       await Members.update(member._id, { position });
-      await loadTree(treeId);
-      showToast(`${member.name} added to canvas`);
+  await loadTree(treeId);
+  showToast(`${displayMemberName(member)} added to canvas`);
     } catch (e) {
       showToast(`Failed to add to canvas: ${e.message}`);
     }
@@ -543,8 +609,9 @@ function App() {
     try {
       console.log(`[handleDropMember] Dropping member ${memberId} at position:`, position);
       await Members.update(memberId, { position });
-      await loadTree(treeId);
-      showToast('Member added to canvas');
+  await loadTree(treeId);
+  const mem = members.find(m => String(m._id) === String(memberId));
+  showToast(`${displayMemberName(mem)} added to canvas`);
     } catch (e) {
       showToast(`Failed to drop member: ${e.message}`);
     }
@@ -678,11 +745,15 @@ function App() {
     try {
       if (selectedId) {
         // EDITING existing member - keep position if they have one
+        // Do not auto-rename on edit; allow duplicates but warn in the modal UI
         await Members.update(selectedId, form);
         showToast('Member updated');
       } else {
         // CREATING new member - NO position, goes to member pool
-        await Members.create({ tree: treeId, ...form });
+        // If no name provided, use an available Person N; otherwise, accept name as-is (duplicates allowed)
+        const incomingName = (form?.name ?? '').trim();
+        const name = incomingName || nextAvailablePersonName();
+        await Members.create({ tree: treeId, ...form, name });
         showToast('Member added to pool. Drag to canvas or click "Add" to visualize.');
       }
       await loadTree(treeId);
@@ -698,7 +769,7 @@ function App() {
     if (!memberId) return;
     
     const member = members.find(m => m._id === memberId);
-    const memberName = member?.name || 'this member';
+    const memberName = member ? displayMemberName(member) : 'this member';
     
     if (deleteEntirely) {
       // Confirm before permanent deletion
@@ -714,7 +785,7 @@ function App() {
         setSelectedId('');
         await Members.delete(memberId);
         await loadTree(treeId);
-        showToast(`${memberName} permanently deleted`);
+  showToast(`${memberName} permanently deleted`);
       } catch (e) {
         showToast(`Delete failed: ${e.message}`);
       }
@@ -732,7 +803,7 @@ function App() {
         setSelectedId('');
         await Members.update(memberId, { position: null });
         await loadTree(treeId);
-        showToast(`${memberName} moved to Member Pool`);
+  showToast(`${memberName} moved to Member Pool`);
       } catch (e) {
         showToast(`Failed to remove from canvas: ${e.message}`);
       }
@@ -780,6 +851,8 @@ function App() {
       setCurrentUser(null);
     }
   }, [token, treeId]);
+
+  // (Removed) temporary node highlight feature
 
   // Expose a small hash-based router for the admin page so the admin UI is reachable at #/admin
   useEffect(() => {
@@ -1198,6 +1271,7 @@ function App() {
         <MemberModal
           open={modalOpen}
           member={selectedMember()}
+          allMembers={members}
           onSave={(payload) => handleSaveMember(payload)}
           onClose={() => { closeMemberModal(); setSelectedId(''); }}
           canSave={!!(token && treeId && canEdit)}

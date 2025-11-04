@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { displayMemberName } from '../utils/format.js';
 import { Trees } from '../utils/api.js';
 
 export default function KinshipPanel({ open, onClose, members = [], treeId, canQuery = true }) {
@@ -11,7 +12,7 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
   const [error, setError] = useState('');
 
   const sortedMembers = useMemo(() => {
-    return [...(members || [])].sort((x, y) => (x.name || '').localeCompare(y.name || ''));
+    return [...(members || [])].sort((x, y) => displayMemberName(x).localeCompare(displayMemberName(y)));
   }, [members]);
 
   if (!open) return null;
@@ -46,13 +47,13 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
           <select value={a} onChange={(e) => setA(e.target.value)} style={{ padding: 6 }}>
             <option value="">Member A…</option>
             {sortedMembers.map(m => (
-              <option key={m._id} value={m._id}>{m.name}</option>
+              <option key={m._id} value={m._id}>{displayMemberName(m)}</option>
             ))}
           </select>
           <select value={b} onChange={(e) => setB(e.target.value)} style={{ padding: 6 }}>
             <option value="">Member B…</option>
             {sortedMembers.map(m => (
-              <option key={m._id} value={m._id}>{m.name}</option>
+              <option key={m._id} value={m._id}>{displayMemberName(m)}</option>
             ))}
           </select>
           <input type="number" min={1} max={20} value={depth} onChange={(e) => setDepth(parseInt(e.target.value || '10', 10))} style={{ width: 80, padding: 6 }} />
@@ -65,9 +66,9 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
             {resultAB && (
               <div style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}>
                 <div style={{ marginBottom: 4 }}>
-                  <strong>{(members.find(m => String(m._id) === String(a)) || {}).name || 'A'}</strong> is
+                  <strong>{displayMemberName(members.find(m => String(m._id) === String(a)) || {}) || 'A'}</strong> is
                   {' '}<strong>{resultAB.label}</strong>{' '}of{' '}
-                  <strong>{(members.find(m => String(m._id) === String(b)) || {}).name || 'B'}</strong>
+                  <strong>{displayMemberName(members.find(m => String(m._id) === String(b)) || {}) || 'B'}</strong>
                 </div>
                 <div style={{ color: '#475569' }}>Class: {resultAB.class}</div>
               </div>
@@ -75,9 +76,9 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
             {resultBA && (
               <div style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}>
                 <div style={{ marginBottom: 4 }}>
-                  <strong>{(members.find(m => String(m._id) === String(b)) || {}).name || 'B'}</strong> is
+                  <strong>{displayMemberName(members.find(m => String(m._id) === String(b)) || {}) || 'B'}</strong> is
                   {' '}<strong>{resultBA.label}</strong>{' '}of{' '}
-                  <strong>{(members.find(m => String(m._id) === String(a)) || {}).name || 'A'}</strong>
+                  <strong>{displayMemberName(members.find(m => String(m._id) === String(a)) || {}) || 'A'}</strong>
                 </div>
                 <div style={{ color: '#475569' }}>Class: {resultBA.class}</div>
               </div>

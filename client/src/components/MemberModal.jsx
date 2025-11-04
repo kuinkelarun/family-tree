@@ -9,9 +9,11 @@ export default function MemberModal({
   canSave = true,
   onDelete, // optional; only for edit mode
   onMoveToPool, // optional; only when on canvas
+  allMembers = [], // for duplicate-name validation
 }) {
   const isEdit = !!(member && member._id);
   const [name, setName] = useState('');
+  const [nickname, setNickname] = useState('');
   const [dob, setDob] = useState('');
   const [photo, setPhoto] = useState('');
   const [notes, setNotes] = useState('');
@@ -27,9 +29,25 @@ export default function MemberModal({
     typeof member.position.x === 'number' &&
     typeof member.position.y === 'number'
   );
+  const duplicateName = (() => {
+    const trimmed = (name || '').trim().toLowerCase();
+    if (!trimmed) return false;
+    return allMembers.some(m => ((m.name || '').trim().toLowerCase() === trimmed) && (!member || String(m._id) !== String(member._id)));
+  })();
+  const duplicateSameNickname = (() => {
+    const nm = (name || '').trim().toLowerCase();
+    const nick = (nickname || '').trim().toLowerCase();
+    if (!nm || !nick) return false;
+    return allMembers.some(m => (
+      (m.name || '').trim().toLowerCase() === nm &&
+      (m.nickname || '').trim().toLowerCase() === nick &&
+      (!member || String(m._id) !== String(member._id))
+    ));
+  })();
   useEffect(() => {
     if (open) {
       setName(member?.name || '');
+      setNickname(member?.nickname || '');
       const isoDob = member?.dob ? new Date(member.dob).toISOString().slice(0, 10) : '';
       setDob(isoDob);
       setPhoto(member?.photo || '');
@@ -44,7 +62,7 @@ export default function MemberModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { name: name.trim() };
+    const payload = { name: name.trim(), nickname: nickname.trim() };
     if (dob && String(dob).trim()) payload.dob = dob;
     if (photo && String(photo).trim()) payload.photo = String(photo).trim();
     if (notes && String(notes).trim()) payload.notes = notes;
@@ -407,6 +425,7 @@ export default function MemberModal({
 
             {/* Right: Details panel */}
             <div style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
               <label style={{ display: 'grid', gap: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
                   Name <span style={{ color: '#dc2626' }}>*</span>
@@ -433,6 +452,44 @@ export default function MemberModal({
                   required
                 />
               </label>
+
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
+                  Nickname
+                </span>
+                <input
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  type="text"
+                  placeholder="e.g., Jr., Sr., Mike, AJ"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    fontSize: 13,
+                    border: '2px solid #e5e7eb',
+                    borderRadius: 8,
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                    background: '#ffffff',
+                    color: '#1f2937',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = '#667eea'; e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e5e7eb'; e.target.style.boxShadow = 'none'; }}
+                />
+              </label>
+              </div>
+              {/* Duplicate name hint and rule: require nickname when duplicate */}
+              {duplicateName && !nickname.trim() && (
+                <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>
+                  This name is already taken. Please add a nickname to distinguish.
+                </div>
+              )}
+              {duplicateSameNickname && (
+                <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>
+                  This name and nickname are already used. Please choose a different nickname.
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <label style={{ display: 'grid', gap: 6 }}>
@@ -563,30 +620,30 @@ export default function MemberModal({
           }}>
             <button 
               type="submit" 
-              disabled={!canSave || !name.trim()} 
+              disabled={!canSave || !name.trim() || (duplicateName && !nickname.trim()) || duplicateSameNickname} 
               style={{ 
                 padding: '8px 12px', 
                 borderRadius: 6, 
-                background: (canSave && name.trim()) ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#94a3b8', 
+                background: (canSave && name.trim() && !(duplicateName && !nickname.trim()) && !duplicateSameNickname) ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#94a3b8', 
                 color: '#fff', 
                 border: 'none', 
-                cursor: (canSave && name.trim()) ? 'pointer' : 'not-allowed',
+                cursor: (canSave && name.trim() && !(duplicateName && !nickname.trim()) && !duplicateSameNickname) ? 'pointer' : 'not-allowed',
                 fontSize: 12,
                 fontWeight: 600,
-                boxShadow: (canSave && name.trim()) ? '0 2px 8px rgba(16, 185, 129, 0.25)' : 'none',
+                boxShadow: (canSave && name.trim() && !(duplicateName && !nickname.trim()) && !duplicateSameNickname) ? '0 2px 8px rgba(16, 185, 129, 0.25)' : 'none',
                 transition: 'all 0.2s',
                 flex: 1,
                 minWidth: 110
               }}
               onMouseEnter={(e) => {
-                if (canSave && name.trim()) {
+                if (canSave && name.trim() && !(duplicateName && !nickname.trim()) && !duplicateSameNickname) {
                   e.currentTarget.style.transform = 'translateY(-1px)';
                   e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = (canSave && name.trim()) ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none';
+                e.currentTarget.style.boxShadow = (canSave && name.trim() && !(duplicateName && !nickname.trim()) && !duplicateSameNickname) ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none';
               }}
             >
               {isEdit ? 'Save Changes' : 'Add Member'}

@@ -1,3 +1,5 @@
+import { displayMemberName } from '../utils/format.js';
+
 export default function Sidebar({ 
   onCheckApi, 
   apiStatus, 
@@ -92,7 +94,7 @@ export default function Sidebar({
                     e.currentTarget.style.borderColor = '#e5e7eb';
                   }}
                 >
-                  <span style={{ fontWeight: 500, flex: 1 }}>{m.name || 'Unnamed'}</span>
+                  <span style={{ fontWeight: 500, flex: 1 }}>{displayMemberName(m)}</span>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button
                       onClick={(e) => { e.stopPropagation(); onAddMemberToCanvas?.(m); }}
@@ -151,7 +153,7 @@ export default function Sidebar({
                     e.currentTarget.style.background = '#f0fdf4';
                   }}
                 >
-                  {m.name || 'Unnamed'}
+                  {displayMemberName(m)}
                 </li>
               ))}
             </ul>
