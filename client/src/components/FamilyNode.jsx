@@ -23,6 +23,12 @@ const baseHandle = {
 };
 
 export default function FamilyNode({ id, data }) {
+  // Swap: connected nodes should use Muted Grayish Blue; non-connected use Light Teal
+  const connectedBg = '#C9D6DF'; // Muted Grayish Blue for connected nodes
+  const nonConnectedBg = '#A0E8E0'; // Light Teal for non-connected nodes
+  const isConnected = !!data?.connected;
+  const nodeRuntimeStyle = { ...nodeStyle, background: isConnected ? connectedBg : nonConnectedBg, border: `1px solid ${isConnected ? '#9fb0bb' : '#7ccfca'}` };
+
   return (
     <div style={{ position: 'relative', padding: 2 }}>
       {/* Top handles */}
@@ -33,7 +39,7 @@ export default function FamilyNode({ id, data }) {
       <Handle type="target" position="left" id="left-target" style={{ ...baseHandle, border: '1px solid #0f172a' }} />
       <Handle type="source" position="left" id="left-source" style={{ ...baseHandle, border: '1px solid #10b981' }} />
 
-      <div style={nodeStyle}>
+      <div style={nodeRuntimeStyle}>
         <div style={{ fontSize: 13, color: '#0f172a' }}>{data?.label ?? id}</div>
       </div>
 

@@ -38,6 +38,7 @@ function App() {
   const [selectedId, setSelectedId] = useState('');
   const [treeMeta, setTreeMeta] = useState(null);
   const [showKinship, setShowKinship] = useState(false);
+  
 
   async function checkApi() {
     try {
@@ -477,7 +478,20 @@ function App() {
     allEdges.push(...remainingEdges);
 
     const e = bundleEdges(allEdges, allNodes);
-    const n = allNodes;
+    // Mark nodes as connected if they appear in any edge (source or target)
+    const connectedSet = new Set();
+    for (const ed of e) {
+      if (ed && ed.source) connectedSet.add(String(ed.source));
+      if (ed && ed.target) connectedSet.add(String(ed.target));
+    }
+    const n = allNodes.map((node) => {
+      // Only mark actual family nodes (not marriagePoint helpers)
+      if (node.type === 'familyNode') {
+        const isConnected = connectedSet.has(String(node.id));
+        return { ...node, data: { ...(node.data || {}), connected: !!isConnected } };
+      }
+      return node;
+    });
     return { n, e, members };
   }
 
@@ -580,7 +594,10 @@ function App() {
       const pos = position && typeof position.x === 'number' && typeof position.y === 'number'
         ? position
         : fallbackPosForIndex(idx);
-      await Members.create({ tree: treeId, name, position: pos });
+      const created = await Members.create({ tree: treeId, name, position: pos });
+      if (created?._id) {
+        // created successfully
+      }
       await loadTree(treeId);
     } catch (e) {
       showToast(`Add node failed: ${e.message}`);
@@ -597,7 +614,9 @@ function App() {
       // Update member with position - this adds them to canvas
       await Members.update(member._id, { position });
   await loadTree(treeId);
-  showToast(`${displayMemberName(member)} added to canvas`);
+  // reload to get up-to-date member object for toast
+  const refreshed = (await Trees.get(treeId)).members.find(m => String(m._id) === String(member._id));
+  showToast(`${displayMemberName(refreshed || member)} added to canvas`);
     } catch (e) {
       showToast(`Failed to add to canvas: ${e.message}`);
     }
@@ -609,9 +628,9 @@ function App() {
     try {
       console.log(`[handleDropMember] Dropping member ${memberId} at position:`, position);
       await Members.update(memberId, { position });
-  await loadTree(treeId);
-  const mem = members.find(m => String(m._id) === String(memberId));
-  showToast(`${displayMemberName(mem)} added to canvas`);
+      await loadTree(treeId);
+      const mem = members.find(m => String(m._id) === String(memberId));
+      showToast(`${displayMemberName(mem)} added to canvas`);
     } catch (e) {
       showToast(`Failed to drop member: ${e.message}`);
     }
