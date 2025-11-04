@@ -29,18 +29,22 @@ export default function MemberModal({
     typeof member.position.x === 'number' &&
     typeof member.position.y === 'number'
   );
+  // Normalize input for case-insensitive and unicode-stable comparisons
+  const normalize = (s) => String(s || '').trim().normalize('NFC').toLocaleLowerCase();
+
   const duplicateName = (() => {
-    const trimmed = (name || '').trim().toLowerCase();
+    const trimmed = normalize(name);
     if (!trimmed) return false;
-    return allMembers.some(m => ((m.name || '').trim().toLowerCase() === trimmed) && (!member || String(m._id) !== String(member._id)));
+    return allMembers.some(m => (normalize(m.name) === trimmed) && (!member || String(m._id) !== String(member._id)));
   })();
+
   const duplicateSameNickname = (() => {
-    const nm = (name || '').trim().toLowerCase();
-    const nick = (nickname || '').trim().toLowerCase();
+    const nm = normalize(name);
+    const nick = normalize(nickname);
     if (!nm || !nick) return false;
     return allMembers.some(m => (
-      (m.name || '').trim().toLowerCase() === nm &&
-      (m.nickname || '').trim().toLowerCase() === nick &&
+      normalize(m.name) === nm &&
+      normalize(m.nickname) === nick &&
       (!member || String(m._id) !== String(member._id))
     ));
   })();

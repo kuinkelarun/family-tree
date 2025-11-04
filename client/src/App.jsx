@@ -193,15 +193,24 @@ function App() {
     const labelById = new Map();
     for (const m of onCanvasMembers) {
       const nm = (m.name || '').trim();
-      if (!nm) { labelById.set(String(m._id), nm); continue; }
+      const nick = (m.nickname || '').trim();
+      // If neither name nor nickname, leave empty
+      if (!nm && !nick) { labelById.set(String(m._id), ''); continue; }
+
+      // If a nickname exists, always show it (either alone or as `Name (Nickname)`)
+      if (nick) {
+        labelById.set(String(m._id), nm ? `${nm} (${nick})` : nick);
+        continue;
+      }
+
+      // No nickname: fall back to name, preserving existing duplicate logic
       const count = nameCounts.get(nm) || 0;
       if (count <= 1) {
         // First/only member with this name: keep as-is
         labelById.set(String(m._id), nm);
       } else {
-        // Multiple members share this name: only use nickname to disambiguate.
-        const nick = (m.nickname || '').trim();
-        labelById.set(String(m._id), nick ? `${nm} (${nick})` : nm);
+        // Multiple members share this name and no nickname available: keep the name
+        labelById.set(String(m._id), nm);
       }
     }
 
@@ -451,12 +460,13 @@ function App() {
         } else {
           let preferThis = false;
           if (type === 'parent' || type === 'child') {
+            // For directional parent/child pairs, avoid flipping direction based on label changes.
+            // Prefer authored over non-authored. If same authored status:
+            // - If same type, allow upgrading to the candidate only to pick up a new label.
+            // - If different types (parent vs child), keep current to preserve direction.
             if (authored && !current.authored) preferThis = true;
             else if (!authored && current.authored) preferThis = false;
-            else if (!!r.label && !current.hasLabel) preferThis = true;
-            else if (!r.label && current.hasLabel) preferThis = false;
-            else if (type === 'parent' && current.type === 'child') preferThis = true;
-            else if (type === 'child' && current.type === 'parent') preferThis = false;
+            else if (type === current.type) preferThis = (!!r.label && !current.hasLabel);
             else preferThis = false;
           } else if (type === 'sibling' || type === 'spouse') {
             if (authored && !current.authored) preferThis = true;
