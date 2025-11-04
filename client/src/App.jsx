@@ -38,6 +38,7 @@ function App() {
   const [selectedId, setSelectedId] = useState('');
   const [treeMeta, setTreeMeta] = useState(null);
   const [showKinship, setShowKinship] = useState(false);
+  const rfApiRef = useRef(null);
   
 
   async function checkApi() {
@@ -1103,9 +1104,84 @@ function App() {
   async function handleExportPng() {
     try {
       if (!exportRef.current) return;
+      // If we have a React Flow instance, fitView first so all nodes/edges are visible in the export
+      const inst = rfApiRef.current;
+      let prevViewport = null;
+      try {
+        if (inst && typeof inst.getViewport === 'function') {
+          prevViewport = inst.getViewport();
+        }
+      } catch (err) {}
+
+      try {
+        if (inst && typeof inst.fitView === 'function') {
+          inst.fitView({ padding: 0.1 });
+          // allow a short delay for layout/paint
+          await new Promise(r => setTimeout(r, 180));
+        }
+      } catch (err) {
+        // ignore
+      }
+
       // Use SVG render path first (captures React Flow edges reliably), then rasterize to PNG
       const svgUrl = await htmlToImage.toSvg(exportRef.current, { backgroundColor: '#ffffff' });
-      const pngUrl = await svgDataUrlToPng(svgUrl, 2);
+
+      // Decide pixel ratio based on current viewport zoom so labels remain readable on large graphs
+      const MIN_ZOOM = 0.12; // below this, increase pixel ratio
+      const MAX_PIXEL_RATIO = 6; // do not exceed this to avoid insane memory usage
+      let pixelRatio = 2;
+      try {
+        if (inst && typeof inst.getViewport === 'function') {
+          const vp = inst.getViewport();
+          const zoom = vp?.zoom || 1;
+          if (zoom < MIN_ZOOM) {
+            pixelRatio = Math.min(MAX_PIXEL_RATIO, Math.ceil(MIN_ZOOM / zoom) * 2);
+          }
+        }
+      } catch (err) {
+        // fallback to default pixelRatio
+        pixelRatio = 2;
+      }
+
+      // Safety cap based on resulting raster size (browser canvas limits)
+      const MAX_CANVAS_DIM = 16000; // conservative cap to avoid OOM or browser failures
+      const tempImg = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = svgUrl;
+      });
+      const naturalW = tempImg.naturalWidth || tempImg.width || 0;
+      const naturalH = tempImg.naturalHeight || tempImg.height || 0;
+      if (naturalW > 0 && naturalH > 0) {
+        const maxDim = Math.max(naturalW, naturalH);
+        if (maxDim * pixelRatio > MAX_CANVAS_DIM) {
+          const cap = Math.floor(MAX_CANVAS_DIM / maxDim) || 1;
+          if (cap < pixelRatio) {
+            showToast(`Large tree detected — reducing export resolution to ${cap}× to avoid browser limits`);
+            pixelRatio = cap;
+          }
+        }
+      }
+
+      const pngUrl = await svgDataUrlToPng(svgUrl, pixelRatio);
+
+      // Restore previous viewport if possible
+      try {
+        if (inst && prevViewport) {
+          if (typeof inst.setViewport === 'function') {
+            inst.setViewport(prevViewport, { duration: 0 });
+          } else if (typeof inst.setCenter === 'function') {
+            inst.setCenter(prevViewport.x, prevViewport.y, { duration: 0 });
+            if (typeof inst.setViewport === 'undefined' && typeof inst.setCenter === 'function') {
+              // best-effort: no zoom restore available
+            }
+          }
+        }
+      } catch (err) {
+        // ignore restore errors
+      }
+
       const link = document.createElement('a');
       link.download = makeFilename('png');
       link.href = pngUrl;
@@ -1216,11 +1292,12 @@ function App() {
           onAddPersonAt={isAuthed && treeId && canEdit ? handleAddPersonAt : undefined}
           canAdd={!!(isAuthed && treeId && canEdit)}
           onConnect={isAuthed && canEdit ? handleConnectEdge : undefined}
-          onNodeClick={handleSelectNode}
+          onNodeDoubleClick={handleSelectNode}
           onNodeDragStop={isAuthed && canEdit ? handleNodeDragStop : undefined}
-          onEdgeClick={isAuthed && canEdit ? handleEdgeClick : undefined}
+          onEdgeDoubleClick={isAuthed && canEdit ? handleEdgeClick : undefined}
           onDropMember={isAuthed && canEdit ? handleDropMember : undefined}
           exportRef={exportRef}
+          onRfReady={(inst) => { rfApiRef.current = inst; }}
         />
         {relPicker.open && (
           <RelationshipPicker

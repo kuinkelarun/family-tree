@@ -40,12 +40,13 @@ export default function TreeBoard({
   onAddPerson: onAddPersonExt, 
   onAddPersonAt, // NEW: callback to add a person at a specific position (flow-space)
   onConnect: onConnectExt, 
-  onNodeClick, 
+  onNodeDoubleClick, 
   onNodeDragStop, 
-  onEdgeClick, 
+  onEdgeDoubleClick, 
   exportRef, 
   canAdd = true,
-  onDropMember // NEW: callback when member is dropped from sidebar
+  onDropMember, // NEW: callback when member is dropped from sidebar
+  onRfReady, // callback to expose react-flow instance to parent
 }) {
   const controlled = Array.isArray(extNodes) && Array.isArray(extEdges);
   const [nodesLocal, setNodesLocal, onNodesChangeLocal] = useNodesState(initialNodes);
@@ -572,13 +573,14 @@ export default function TreeBoard({
         onEdgeUpdate={onEdgeUpdate}
         connectionLineType="smoothstep"
         connectionMode="loose"
-          onNodeClick={onNodeClick ? (_e, node) => onNodeClick(node?.id, node) : undefined}
+          onNodeDoubleClick={onNodeDoubleClick ? (_e, node) => onNodeDoubleClick(node?.id, node) : undefined}
           onNodeDragStart={onNodeDragStartLocal}
           onNodeDrag={onNodeDragLocal}
           onNodeDragStop={onNodeDragStopLocal}
-          onEdgeClick={onEdgeClick ? (e, edge) => onEdgeClick(e, edge) : undefined}
+          onEdgeDoubleClick={onEdgeDoubleClick ? (e, edge) => onEdgeDoubleClick(e, edge) : undefined}
           onInit={(inst) => {
             setRfInstance(inst);
+            try { if (typeof onRfReady === 'function') onRfReady(inst); } catch (e) {}
             try {
               const vp = inst?.getViewport?.();
               if (vp) setViewport(vp);
