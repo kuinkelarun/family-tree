@@ -20,23 +20,41 @@ export function localizeKinship(result, locale = 'en') {
   const dict = locales[locale] || locales['en'];
   const code = result?.meta?.relationCode;
   const affinal = !!result?.meta?.affinal;
-  const wrapAffinal = (s) => affinal ? s + (dict.affinalSuffix || ' in-law') : s;
+  const affinalizeOut = (type, baseLabel, level) => {
+    if (!affinal) return baseLabel;
+    // Try affinal overrides per relation type first
+    if (dict.affinal) {
+      if ((type === 'ancestor' || type === 'descendant' || type === 'aunt_uncle' || type === 'niece_nephew') && dict.affinal[type]) {
+        const section = dict.affinal[type];
+        const over = formatTier(section, level || 1);
+        if (over) return over;
+      }
+      if (type === 'sibling' && typeof dict.affinal.sibling === 'string' && dict.affinal.sibling) {
+        return dict.affinal.sibling;
+      }
+    }
+    // Fallback to suffix strategy
+    return baseLabel + (dict.affinalSuffix || ' in-law');
+  };
 
-  if (!code) return wrapAffinal(result?.label || '');
+  if (!code) return affinalizeOut('unknown', result?.label || '', 1);
 
   switch (code.type) {
     case 'self': return dict.self;
     case 'spouse': return dict.spouse;
-    case 'ancestor': return wrapAffinal(formatTier(dict.ancestor, code.level));
-    case 'descendant': return wrapAffinal(formatTier(dict.descendant, code.level));
-    case 'sibling': return wrapAffinal(code.half ? dict.sibling.half : dict.sibling.full);
+    case 'ancestor': return affinalizeOut('ancestor', formatTier(dict.ancestor, code.level), code.level);
+    case 'descendant': return affinalizeOut('descendant', formatTier(dict.descendant, code.level), code.level);
+    case 'sibling': {
+      const base = code.half ? dict.sibling.half : dict.sibling.full;
+      return affinalizeOut('sibling', base, 1);
+    }
     case 'step': return dict.step[code.role] || result.label;
-    case 'aunt_uncle': return wrapAffinal(formatTier(dict.aunt_uncle, code.level));
-    case 'niece_nephew': return wrapAffinal(formatTier(dict.niece_nephew, code.level));
-    case 'cousin': return wrapAffinal(formatCousin(dict.cousin, code.degree, code.removal));
+    case 'aunt_uncle': return affinalizeOut('aunt_uncle', formatTier(dict.aunt_uncle, code.level), code.level);
+    case 'niece_nephew': return affinalizeOut('niece_nephew', formatTier(dict.niece_nephew, code.level), code.level);
+    case 'cousin': return affinalizeOut('cousin', formatCousin(dict.cousin, code.degree, code.removal), 1);
     case 'related_undetermined': return dict.related_undetermined;
     case 'unrelated': return dict.unrelated;
-    default: return wrapAffinal(result?.label || '');
+    default: return affinalizeOut(code.type || 'unknown', result?.label || '', 1);
   }
 }
 

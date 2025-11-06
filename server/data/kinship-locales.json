@@ -20,7 +20,7 @@
     "unrelated": "unrelated (by blood)"
   },
   "np": {
-    "affinalSuffix": " सालो",  
+    "affinalSuffix": "",  
     "self": "स्वयम्",
     "spouse": "जीवनसाथी",
   "ancestor": { 
@@ -80,5 +80,11 @@
     },
     "related_undetermined": "अनिश्चित पारिवारिक सम्बन्ध",
     "unrelated": "रक्त सम्बन्ध छैन"
+    ,
+    "affinal": {
+      "sibling": "भिनाजु/देवर/सालो/साली",
+      "ancestor": { "level1": "ससुरा/सासू", "level2": "हजुर ससुरा/हजुर सासू", "greatPrefix": "पर", "root": "हजुर ससुरा/हजुर सासू" },
+      "descendant": { "level1": "बुहारी/ज्वाइँ", "level2": "हजुर बुहारी/हजुर ज्वाइँ", "greatPrefix": "पर", "root": "हजुर बुहारी/हजुर ज्वाइँ" }
+    }
   }
 }

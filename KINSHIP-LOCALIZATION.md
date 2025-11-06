@@ -23,6 +23,7 @@ When you edit `server/data/kinship-locales.json`, restart the server to reload t
   - `{ type: 'spouse' }`, `{ type: 'self' }`, `{ type: 'related_undetermined' }`, `{ type: 'unrelated' }`
 - The localizer (`localizeKinship`) uses `relationCode` and the selected locale (e.g., `en`, `np`) to format a label.
 - “In-law” relationships are handled by an `affinal` flag in `meta`; the localizer appends a locale-specific `affinalSuffix`.
+  - TIP: You can define explicit `affinal` overrides per relation (e.g., `sibling` → dedicated in-law label; `ancestor`/`descendant` → parent/child-in-law tiers). If no override is present, a suffix is appended.
 
 ### Per-level overrides (unique names for each generation)
 
@@ -63,6 +64,9 @@ Open `server/data/kinship-locales.json`. It contains a top-level object keyed by
     - Example (Nepali ancestor): `greatPrefix = "पर"`, `root = "हजुरबा/हजुरआमा"`
 - `sibling`: `{ full, half }`
 - `step`: `{ parent, child, sibling }`
+- `affinal` (optional): in-law overrides
+  - `sibling`: string for “sibling-in-law”
+  - `ancestor`, `descendant`: same shape as their non-affinal counterparts (supports `level1`, `level2`, `levels`, `greatPrefix`, `root`)
 - `cousin`:
   - `degreeTemplate`: e.g., `"{ordinal} cousin"`
   - `removedOnce`, `removedTwice`, `removedMany`: e.g., `"{base} once removed"`, `"{base} {n} times removed"`
@@ -108,6 +112,11 @@ Open `server/data/kinship-locales.json`. It contains a top-level object keyed by
       "removedTwice": "{base} दुई पटक हटाइएको",
       "removedMany": "{base} {n} पटक हटाइएको",
       "ordinals": { "1": "पहिलो", "2": "दोस्रो", "3": "तेस्रो", "4": "चौथो" }
+    },
+    "affinal": {
+      "sibling": "भिनाजु/देवर/सालो/साली",
+      "ancestor": { "level1": "ससुरा/सासू", "level2": "हजुर ससुरा/हजुर सासू", "greatPrefix": "पर", "root": "हजुर ससुरा/हजुर सासू" },
+      "descendant": { "level1": "बुहारी/ज्वाइँ", "level2": "हजुर बुहारी/हजुर ज्वाइँ", "greatPrefix": "पर", "root": "हजुर बुहारी/हजुर ज्वाइँ" }
     },
     "related_undetermined": "अनिश्चित पारिवारिक सम्बन्ध",
     "unrelated": "रक्त सम्बन्ध छैन"
