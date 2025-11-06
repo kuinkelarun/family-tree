@@ -1,4 +1,5 @@
 import { displayMemberName } from '../utils/format.js';
+import { ChevronLeftIcon } from '@heroicons/react/24/solid';
 
 export default function Sidebar({ 
   onCheckApi, 
@@ -31,12 +32,30 @@ export default function Sidebar({
   return (
     <aside style={{ width: 240, padding: 12, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', transition: 'width 0.25s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <h2 style={{ marginTop: 0, fontSize: 18, color: '#111827', margin: 0, flex: 1 }}>Family Tree</h2>
         {currentUser && Array.isArray(currentUser.roles) && currentUser.roles.includes('admin') && (
           <button onClick={() => onOpenAdmin?.()} title="Admin" style={{ padding: '4px 8px', borderRadius: 6, background: '#111827', color: '#fff', border: 'none' }}>Admin</button>
         )}
+        <div style={{ flex: 1 }} />
         {typeof onCollapse === 'function' && (
-          <button onClick={onCollapse} title="Collapse" style={{ padding: '4px 6px', borderRadius: 6, background: '#e2e8f0', color: '#334155', border: '1px solid #cbd5e1', fontSize: 12 }}>◀</button>
+          <button
+            onClick={onCollapse}
+            title="Collapse"
+            style={{
+              padding: 4,
+              width: 28,
+              height: 28,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 6,
+              background: '#e2e8f0',
+              color: '#334155',
+              border: '1px solid #cbd5e1',
+              cursor: 'pointer'
+            }}
+          >
+            <ChevronLeftIcon style={{ width: 16, height: 16 }} />
+          </button>
         )}
       </div>
       {/* Left pane control area intentionally minimal for production: no debug controls */}

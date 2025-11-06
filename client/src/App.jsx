@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
+import { ChevronRightIcon } from '@heroicons/react/24/solid';
 import './App.css';
 import Sidebar from './components/Sidebar.jsx';
 import TreeBoard from './components/TreeBoard.jsx';
@@ -1872,7 +1873,7 @@ function App() {
           }}
           title="Expand sidebar"
         >
-          <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: 10, color: '#475569', opacity: slotHover ? 0.8 : 0.55 }}>Expand</div>
+          <ChevronRightIcon style={{ width: 16, height: 16, color: '#475569', opacity: slotHover ? 0.85 : 0.6 }} />
         </div>
       )}
       {!sidebarCollapsed && <Sidebar 
@@ -1891,8 +1892,8 @@ function App() {
         onCollapse={() => setSidebarCollapsed(true)}
       />}
   <main style={{ flex: 1, padding: '6px 12px 12px', display: 'flex', flexDirection: 'column' }}>
-        <header style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
-          <h1 style={{ margin: 0 }}>Family Tree Builder</h1>
+        <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
+          <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>Family Tree Builder</h1>
           {/* Right-aligned action bar (restored). Only change: email is positioned above the Logout button */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
             {isAuthed ? (
