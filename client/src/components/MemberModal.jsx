@@ -268,110 +268,8 @@ export default function MemberModal({
                 )}
               </div>
 
-              {/* Photo edit panel (URL + Upload) - toggled */}
-              {photoEditOpen && (
-                <div style={{ display: 'grid', gap: 8, padding: 6, background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 10, position: 'relative', zIndex: 3, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <strong style={{ fontSize: 12, color: '#374151' }}>{photo?.trim() ? 'Change Photo' : 'Add Photo'}</strong>
-                    <button
-                      type="button"
-                      onClick={() => setPhotoEditOpen(false)}
-                      style={{ fontSize: 11, background: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer' }}
-                    >
-                      ✕ Close
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', flexWrap: 'wrap' }}>
-                    <input
-                      value={photo}
-                      onChange={(e) => setPhoto(e.target.value)}
-                      type="text"
-                      placeholder="https://... or /uploads/your-file.jpg"
-                      style={{
-                        flex: 1,
-                        minWidth: 160,
-                        padding: '6px 10px',
-                        height: '34px',
-                        fontSize: 12,
-                        border: '2px solid #e5e7eb',
-                        borderRadius: 8,
-                        outline: 'none',
-                        transition: 'all 0.2s',
-                        background: '#ffffff',
-                        color: '#1f2937',
-                        boxSizing: 'border-box'
-                      }}
-                      onInput={(e) => {
-                        const input = e.currentTarget;
-                        const val = input.value.trim();
-                        if (!val) { input.setCustomValidity(''); return; }
-                        const ok = /^https?:\/\//i.test(val) || /^\/uploads\//.test(val);
-                        input.setCustomValidity(ok ? '' : 'Enter a full URL (https://...) or an uploaded path like /uploads/filename.jpg');
-                      }}
-                      onFocus={(e) => { e.target.style.borderColor = '#667eea'; e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'; }}
-                      onBlur={(e) => { e.target.style.borderColor = '#e5e7eb'; e.target.style.boxShadow = 'none'; }}
-                    />
-
-                    {/* Hidden native file input */}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      onChange={async (e) => {
-                        const f = e.target.files && e.target.files[0];
-                        if (!f) return;
-                        setUploadError('');
-                        try {
-                          const dataUrl = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(f);
-                          });
-                          setUploading(true);
-                          const resp = await api('/api/uploads', { method: 'POST', body: { dataUrl } });
-                          setPhoto(resp.url || '');
-                          setPhotoEditOpen(false);
-                        } catch (err) {
-                          setUploadError(err?.message || 'Upload failed');
-                        } finally {
-                          setUploading(false);
-                          e.target.value = '';
-                        }
-                      }}
-                    />
-
-                    {/* Styled trigger button */}
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      style={{
-                        padding: '5px 8px',
-                        fontSize: 12,
-                        border: '2px solid #e5e7eb',
-                        borderRadius: 6,
-                        background: '#f3f4f6',
-                        color: '#111827',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        whiteSpace: 'nowrap',
-                        height: '34px'
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e7eb'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
-                      title="Upload a photo from your device"
-                    >
-                      Choose File to Upload
-                    </button>
-
-                    {uploading && <span style={{ alignSelf: 'center', fontSize: 11, color: '#1f6feb' }}>Uploading…</span>}
-                    {uploadError && <span style={{ alignSelf: 'center', fontSize: 11, color: '#dc2626' }}>{uploadError}</span>}
-                  </div>
-                  <span style={{ fontSize: 10, color: '#6b7280' }}>Tip: paste a https:// URL or use Choose File to Upload to create a /uploads/... path.</span>
-                </div>
-              )}
+              {/* Photo edit panel moved to centered glass-style modal overlay below */}
+              {photoEditOpen && null}
 
               {/* Lightbox overlay */}
               {lightboxOpen && (
@@ -796,6 +694,146 @@ export default function MemberModal({
           </div>
         </form>
       </div>
+
+      {/* Centered glass-style popup for photo add/change */}
+      {photoEditOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPhotoEditOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 3500,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(15, 23, 42, 0.35)', // slate-900/35 overlay tint
+            backdropFilter: 'blur(6px) saturate(120%)',
+            WebkitBackdropFilter: 'blur(6px) saturate(120%)',
+            animation: 'fadeIn 0.15s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(520px, 92vw)',
+              background: 'rgba(255, 255, 255, 0.58)',
+              border: '1px solid rgba(255, 255, 255, 0.7)',
+              borderRadius: 16,
+              boxShadow: '0 24px 60px rgba(0,0,0,0.35)',
+              backdropFilter: 'blur(14px) saturate(160%)',
+              WebkitBackdropFilter: 'blur(14px) saturate(160%)',
+              padding: 14,
+              display: 'grid',
+              gap: 10,
+              animation: 'slideUp 0.2s ease-out'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <strong style={{ fontSize: 13, color: '#111827' }}>{photo?.trim() ? 'Change Photo' : 'Add Photo'}</strong>
+              <button
+                type="button"
+                onClick={() => setPhotoEditOpen(false)}
+                style={{ fontSize: 12, background: 'transparent', border: 'none', color: '#374151', cursor: 'pointer' }}
+                aria-label="Close add photo popup"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
+              <input
+                value={photo}
+                onChange={(e) => setPhoto(e.target.value)}
+                type="text"
+                placeholder="https://... or /uploads/your-file.jpg"
+                style={{
+                  flex: 1,
+                  minWidth: 200,
+                  padding: '8px 12px',
+                  height: '38px',
+                  fontSize: 12,
+                  border: '2px solid rgba(229, 231, 235, 0.9)',
+                  borderRadius: 10,
+                  outline: 'none',
+                  transition: 'all 0.2s',
+                  background: 'rgba(255,255,255,0.75)',
+                  color: '#111827',
+                  boxSizing: 'border-box'
+                }}
+                onInput={(e) => {
+                  const input = e.currentTarget;
+                  const val = input.value.trim();
+                  if (!val) { input.setCustomValidity(''); return; }
+                  const ok = /^https?:\/\//i.test(val) || /^\/uploads\//.test(val);
+                  input.setCustomValidity(ok ? '' : 'Enter a full URL (https://...) or an uploaded path like /uploads/filename.jpg');
+                }}
+                onFocus={(e) => { e.target.style.borderColor = '#667eea'; e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.15)'; }}
+                onBlur={(e) => { e.target.style.borderColor = 'rgba(229, 231, 235, 0.9)'; e.target.style.boxShadow = 'none'; }}
+              />
+
+              {/* Hidden native file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const f = e.target.files && e.target.files[0];
+                  if (!f) return;
+                  setUploadError('');
+                  try {
+                    const dataUrl = await new Promise((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onload = () => resolve(reader.result);
+                      reader.onerror = reject;
+                      reader.readAsDataURL(f);
+                    });
+                    setUploading(true);
+                    const resp = await api('/api/uploads', { method: 'POST', body: { dataUrl } });
+                    setPhoto(resp.url || '');
+                    setPhotoEditOpen(false);
+                  } catch (err) {
+                    setUploadError(err?.message || 'Upload failed');
+                  } finally {
+                    setUploading(false);
+                    e.target.value = '';
+                  }
+                }}
+              />
+
+              {/* Styled trigger button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  padding: '7px 10px',
+                  fontSize: 12,
+                  border: '2px solid rgba(229, 231, 235, 0.9)',
+                  borderRadius: 10,
+                  background: 'rgba(243, 244, 246, 0.85)',
+                  color: '#111827',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                  height: '38px'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(229, 231, 235, 0.9)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(243, 244, 246, 0.85)'; }}
+                title="Upload a photo from your device"
+              >
+                Choose File to Upload
+              </button>
+
+              {uploading && <span style={{ alignSelf: 'center', fontSize: 11, color: '#1f6feb' }}>Uploading…</span>}
+              {uploadError && <span style={{ alignSelf: 'center', fontSize: 11, color: '#dc2626' }}>{uploadError}</span>}
+            </div>
+
+            <span style={{ fontSize: 11, color: '#374151' }}>Tip: paste a https:// URL or use Choose File to Upload to create a /uploads/... path.</span>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes fadeIn {
