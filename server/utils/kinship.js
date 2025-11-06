@@ -30,7 +30,7 @@ export function buildAdjacency(members) {
       } else if (r.type === 'parent') {
         add(parentsOf, mid, rid);  // m -> parent
         add(childrenOf, rid, mid); // parent -> m
-      } else if (r.type === 'spouse') {
+      } else if (r.type === 'spouse' || r.type === 'partner' || (r.type === 'custom' && typeof r.label === 'string' && ['partner','spouse'].includes(r.label.toLowerCase()))) {
         add(spousesOf, mid, rid);  // symmetric spouse relation
         add(spousesOf, rid, mid);
       } else if (r.type === 'sibling') {
@@ -46,6 +46,22 @@ export function buildAdjacency(members) {
     if (!childrenOf.has(mid)) childrenOf.set(mid, new Set());
     if (!spousesOf.has(mid)) spousesOf.set(mid, new Set());
     if (!siblingsOf.has(mid)) siblingsOf.set(mid, new Set());
+  }
+
+  // Inference pass: propagate known parents across explicit sibling edges.
+  // If X is an explicit sibling of Y and Y has a parent P, infer P as a parent of X (and X as a child of P).
+  // This helps when sibling links exist but parent links are missing for one sibling (common in partial data entry).
+  for (const [x, sibs] of siblingsOf.entries()) {
+    const xParents = parentsOf.get(x) || new Set();
+    for (const y of sibs) {
+      const yParents = parentsOf.get(y) || new Set();
+      for (const p of yParents) {
+        if (!xParents.has(p)) {
+          add(parentsOf, x, p);
+          add(childrenOf, p, x);
+        }
+      }
+    }
   }
 
   return { parentsOf, childrenOf, spousesOf, siblingsOf };
