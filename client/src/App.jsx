@@ -1863,11 +1863,11 @@ function App() {
         <header style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0 }}>Family Tree Builder</h1>
           {/* Right-aligned action bar (restored). Only change: email is positioned above the Logout button */}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
             {isAuthed ? (
               <>
                 {/* Keep original order of controls */}
-                <button onClick={handleCreateTree} style={{ padding: '6px 10px', borderRadius: 6, background: '#16a34a', color: '#fff', border: 'none' }}>Create Tree</button>
+                <button onClick={handleCreateTree} style={{ padding: '6px 10px', borderRadius: 6, background: '#16a34a', color: '#fff', border: 'none', flexShrink: 0 }}>Create Tree</button>
                 <select value={treeId || ''} onChange={(e) => { const id = e.target.value; handleSelectTree(id); }} style={{ padding: 6 }}>
                   <option value="">Select a tree…</option>
                   {myTrees.map((t) => (
@@ -1875,11 +1875,11 @@ function App() {
                   ))}
                 </select>
                 {isOwner && treeId && (
-                  <button onClick={handleDeleteTree} title="Permanently delete this tree" style={{ padding: '6px 10px', borderRadius: 6, background: '#dc2626', color: '#fff', border: 'none' }}>Delete Tree</button>
+                  <button onClick={handleDeleteTree} title="Permanently delete this tree" style={{ padding: '6px 10px', borderRadius: 6, background: '#dc2626', color: '#fff', border: 'none', flexShrink: 0 }}>Delete Tree</button>
                 )}
                 <button title="Refresh list" onClick={loadMyTrees} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1' }}>↻</button>
                 <button onClick={() => setShowKinship(true)} disabled={!treeId || !members.length} style={{ padding: '6px 10px', borderRadius: 6, background: (treeId && members.length) ? '#6b7280' : '#94a3b8', color: '#fff', border: 'none' }}>Kinship</button>
-                <button onClick={handleExportPng} disabled={!nodes.length} style={{ padding: '6px 10px', borderRadius: 6, background: nodes.length ? '#0ea5e9' : '#94a3b8', color: '#fff', border: 'none' }}>Export PNG</button>
+                <button onClick={handleExportPng} disabled={!nodes.length} style={{ padding: '6px 10px', borderRadius: 6, background: nodes.length ? '#0ea5e9' : '#94a3b8', color: '#fff', border: 'none', flexShrink: 0 }}>Export PNG</button>
                 {/* Logout group with email above, aligned right */}
                 <div style={{ position: 'relative', display: 'inline-flex' }}>
                   <span style={{ position: 'absolute', right: 0, bottom: '100%', marginBottom: 2, color: '#1f2937', fontSize: 12 }}>{currentUser?.email}</span>
