@@ -207,6 +207,11 @@ export default function TreeBoard({
   let curW = Number.isFinite(node.width) ? node.width : undefined;
   let curH = Number.isFinite(node.height) ? node.height : undefined;
 
+      // Convert pixel thresholds to flow-space thresholds based on current zoom
+      const z = Math.max(0.01, viewport?.zoom || 1);
+      const snapTh = SNAP_THRESHOLD / z;
+      const guideTh = GUIDE_THRESHOLD / z;
+
       // Prefer measured nodes from React Flow instance (includes width/height)
       const rfNodes = (rfInstance && typeof rfInstance.getNodes === 'function') ? rfInstance.getNodes() : nodes;
       const others = (rfNodes || []).filter((n) => String(n.id) !== curId);
@@ -262,7 +267,7 @@ export default function TreeBoard({
         if (dxLeft < bestDx) {
           bestDx = dxLeft;
           // Only compute snap target if within SNAP_THRESHOLD
-          if (dxLeft <= SNAP_THRESHOLD) {
+          if (dxLeft <= snapTh) {
             snapX = ax; // left alignment
           }
           bestAnchorX = ax; // Always remember best anchor for guides
@@ -272,7 +277,7 @@ export default function TreeBoard({
           const dxCenter = Math.abs(ax - curCenterX);
           if (dxCenter < bestDx) {
             bestDx = dxCenter;
-            if (dxCenter <= SNAP_THRESHOLD) {
+            if (dxCenter <= snapTh) {
               snapX = ax - curW / 2; // center alignment
             }
             bestAnchorX = ax;
@@ -283,7 +288,7 @@ export default function TreeBoard({
           const dxRight = Math.abs(ax - curRight);
           if (dxRight < bestDx) {
             bestDx = dxRight;
-            if (dxRight <= SNAP_THRESHOLD) {
+            if (dxRight <= snapTh) {
               snapX = ax - curW; // right alignment
             }
             bestAnchorX = ax;
@@ -300,7 +305,7 @@ export default function TreeBoard({
         const dyTop = Math.abs(ay - curTop);
         if (dyTop < bestDy) {
           bestDy = dyTop;
-          if (dyTop <= SNAP_THRESHOLD) {
+          if (dyTop <= snapTh) {
             snapY = ay; // top alignment
           }
           bestAnchorY = ay;
@@ -310,7 +315,7 @@ export default function TreeBoard({
           const dyCenter = Math.abs(ay - curCenterY);
           if (dyCenter < bestDy) {
             bestDy = dyCenter;
-            if (dyCenter <= SNAP_THRESHOLD) {
+            if (dyCenter <= snapTh) {
               snapY = ay - curH / 2; // center alignment
             }
             bestAnchorY = ay;
@@ -321,7 +326,7 @@ export default function TreeBoard({
           const dyBottom = Math.abs(ay - curBottom);
           if (dyBottom < bestDy) {
             bestDy = dyBottom;
-            if (dyBottom <= SNAP_THRESHOLD) {
+            if (dyBottom <= snapTh) {
               snapY = ay - curH; // bottom alignment
             }
             bestAnchorY = ay;
@@ -330,20 +335,20 @@ export default function TreeBoard({
       });
 
       // Show guides when within guide threshold
-      const showXGuide = bestAnchorX != null && bestDx <= GUIDE_THRESHOLD;
-      const showYGuide = bestAnchorY != null && bestDy <= GUIDE_THRESHOLD;
+      const showXGuide = bestAnchorX != null && bestDx <= guideTh;
+      const showYGuide = bestAnchorY != null && bestDy <= guideTh;
       setAlignGuides({ x: showXGuide ? bestAnchorX : null, y: showYGuide ? bestAnchorY : null });
 
       // Snap only when within snap threshold on respective axis
-      const shouldSnapX = bestDx <= SNAP_THRESHOLD;
-      const shouldSnapY = bestDy <= SNAP_THRESHOLD;
+      const shouldSnapX = bestDx <= snapTh;
+      const shouldSnapY = bestDy <= snapTh;
       if (shouldSnapX || shouldSnapY) {
         setNodes((nds) => nds.map((n) => (String(n.id) === curId ? { ...n, position: { x: shouldSnapX ? snapX : curLeft, y: shouldSnapY ? snapY : curTop } } : n)));
       }
     } catch (err) {
       // Fail-safe: ignore snapping if any calculation fails
     }
-  }, [setNodes]);
+  }, [setNodes, viewport, rfInstance, nodes]);
 
   const onNodeDragStopLocal = useCallback((event, node) => {
     const g = groupDragRef.current;
@@ -645,29 +650,59 @@ export default function TreeBoard({
         <Controls position="bottom-left" />
         <Background variant="dots" gap={16} size={1} />
       </ReactFlow>
-      {/* Alignment guides overlay (screen-space) */}
+      {/* Alignment guides overlay (screen-space) with smooth fade */}
       {(() => {
-        const lines = [];
         const z = viewport?.zoom || 1;
         const vx = viewport?.x || 0;
         const vy = viewport?.y || 0;
-        if (alignGuides.x != null) {
-          const left = Math.round(vx + (alignGuides.x * z));
-          lines.push(
-            <div key="v-guide" style={{ position: 'absolute', top: 0, bottom: 0, left, width: 1, background: 'rgba(59,130,246,0.5)', pointerEvents: 'none' }} />
-          );
-        }
-        if (alignGuides.y != null) {
-          const top = Math.round(vy + (alignGuides.y * z));
-          lines.push(
-            <div key="h-guide" style={{ position: 'absolute', left: 0, right: 0, top, height: 1, background: 'rgba(59,130,246,0.5)', pointerEvents: 'none' }} />
-          );
-        }
-        return lines.length ? (
-          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-            {lines}
+        const hasX = alignGuides.x != null;
+        const hasY = alignGuides.y != null;
+        const vLeft = hasX ? Math.round(vx + (alignGuides.x * z)) : null;
+        const hTop = hasY ? Math.round(vy + (alignGuides.y * z)) : null;
+        const hasAny = hasX || hasY;
+
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              opacity: hasAny ? 1 : 0,
+              transition: 'opacity 140ms ease-in-out',
+              willChange: 'opacity',
+              zIndex: 50,
+            }}
+          >
+            {hasX ? (
+              <div
+                key="v-guide"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: vLeft,
+                  width: 1,
+                  background: 'rgba(59,130,246,0.45)',
+                  pointerEvents: 'none',
+                }}
+              />
+            ) : null}
+            {hasY ? (
+              <div
+                key="h-guide"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  top: hTop,
+                  height: 1,
+                  background: 'rgba(59,130,246,0.45)',
+                  pointerEvents: 'none',
+                }}
+              />
+            ) : null}
           </div>
-        ) : null;
+        );
       })()}
       {!!notice && (
         <div style={{ position: 'absolute', left: 12, bottom: 12, background: '#111827', color: '#fff', padding: '6px 8px', borderRadius: 6, fontSize: 12, boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>

@@ -163,7 +163,7 @@ export default function Sidebar({
               margin: '8px 0 0 0',
               display: 'grid',
               gap: 4,
-              height: 10 * 38, // fixed viewport for 10 items
+              height: 9 * 38, // fixed viewport for 10 items
               overflowY: 'auto',
               paddingRight: 4,
               alignContent: 'start', // prevent rows from stretching when fewer than 10
