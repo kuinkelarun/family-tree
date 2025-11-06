@@ -30,7 +30,7 @@ export default function Sidebar({
   }
 
   return (
-    <aside style={{ width: 240, padding: 12, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', transition: 'width 0.25s ease' }}>
+    <aside style={{ width: 240, padding: 12, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', alignSelf: 'stretch', boxSizing: 'border-box', overflow: 'hidden', transition: 'width 0.25s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         {currentUser && Array.isArray(currentUser.roles) && currentUser.roles.includes('admin') && (
           <button onClick={() => onOpenAdmin?.()} title="Admin" style={{ padding: '4px 8px', borderRadius: 6, background: '#111827', color: '#fff', border: 'none' }}>Admin</button>
@@ -163,9 +163,11 @@ export default function Sidebar({
               margin: '8px 0 0 0',
               display: 'grid',
               gap: 4,
-              height: 9 * 38, // fixed viewport for 10 items
+              height: 10 * 38, // fixed viewport for 10 items
               overflowY: 'auto',
-              paddingRight: 4
+              paddingRight: 4,
+              alignContent: 'start', // prevent rows from stretching when fewer than 10
+              gridAutoRows: 'min-content' // keep each row at content height
             }}>
               {membersOnCanvas.map((m) => (
                 <li
