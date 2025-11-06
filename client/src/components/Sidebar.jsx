@@ -13,6 +13,8 @@ export default function Sidebar({
   onOpenAdmin,
   canAddMember = false,
   showToast,
+  onCollapse, // new: callback to collapse
+  collapsed = false, // reserved (not used internally yet)
 }) {
   // Members that are NOT yet on canvas
   const membersNotOnCanvas = members.filter(m => !nodesOnCanvas.includes(m._id));
@@ -27,19 +29,22 @@ export default function Sidebar({
   }
 
   return (
-    <aside style={{ width: 240, padding: 16, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <h2 style={{ marginTop: 0, fontSize: 20, color: '#111827', margin: 0 }}>Family Tree</h2>
+    <aside style={{ width: 240, padding: 12, borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', transition: 'width 0.25s ease' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <h2 style={{ marginTop: 0, fontSize: 18, color: '#111827', margin: 0, flex: 1 }}>Family Tree</h2>
         {currentUser && Array.isArray(currentUser.roles) && currentUser.roles.includes('admin') && (
-          <button onClick={() => onOpenAdmin?.()} title="Admin" style={{ marginLeft: 'auto', padding: '4px 8px', borderRadius: 6, background: '#111827', color: '#fff', border: 'none' }}>Admin</button>
+          <button onClick={() => onOpenAdmin?.()} title="Admin" style={{ padding: '4px 8px', borderRadius: 6, background: '#111827', color: '#fff', border: 'none' }}>Admin</button>
+        )}
+        {typeof onCollapse === 'function' && (
+          <button onClick={onCollapse} title="Collapse" style={{ padding: '4px 6px', borderRadius: 6, background: '#e2e8f0', color: '#334155', border: '1px solid #cbd5e1', fontSize: 12 }}>◀</button>
         )}
       </div>
       {/* Left pane control area intentionally minimal for production: no debug controls */}
       
-      <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
+  <hr style={{ margin: '12px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
       
       {/* Member Pool - NOT on canvas */}
-      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+  <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div>
           <strong style={{ fontSize: 14, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }}></span>

@@ -43,6 +43,8 @@ function App() {
   const [layoutActive, setLayoutActive] = useState(false);
   const [layoutBusy, setLayoutBusy] = useState(false);
   const prevPositionsRef = useRef(null); // { positions: { id -> {x,y} }, viewport }
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [slotHover, setSlotHover] = useState(false);
   
 
   async function checkApi() {
@@ -1845,7 +1847,35 @@ function App() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif', background: '#f8fafc' }}>
-      <Sidebar 
+      {sidebarCollapsed && (
+        <div
+          onClick={() => setSidebarCollapsed(false)}
+          onMouseEnter={() => setSlotHover(true)}
+          onMouseLeave={() => setSlotHover(false)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSidebarCollapsed(false);
+            }
+          }}
+          style={{
+            width: slotHover ? 20 : 18,
+            background: slotHover ? 'linear-gradient(to right,#e2e8f0,#ffffff)' : 'linear-gradient(to right,#f1f5f9,#ffffff)',
+            borderRight: `1px solid ${slotHover ? '#cbd5e1' : '#e2e8f0'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'width 150ms ease, background-color 150ms ease, border-color 150ms ease'
+          }}
+          title="Expand sidebar"
+        >
+          <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: 10, color: '#475569', opacity: slotHover ? 0.8 : 0.55 }}>Expand</div>
+        </div>
+      )}
+      {!sidebarCollapsed && <Sidebar 
         onCheckApi={checkApi} 
         apiStatus={apiStatus}
         members={members}
@@ -1858,8 +1888,9 @@ function App() {
         onOpenAdmin={() => { window.location.hash = '#/admin'; }}
         canAddMember={!!(isAuthed && treeId && canEdit)}
         showToast={showToast}
-      />
-      <main style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column' }}>
+        onCollapse={() => setSidebarCollapsed(true)}
+      />}
+      <main style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0 }}>Family Tree Builder</h1>
           {/* Right-aligned action bar (restored). Only change: email is positioned above the Logout button */}
