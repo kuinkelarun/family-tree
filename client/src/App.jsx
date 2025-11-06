@@ -316,8 +316,9 @@ function App() {
           targetHandle: 'top-target',
           type: 'smoothstep',
           style: { stroke: RELATIONSHIP_COLORS.child, strokeWidth: 2 },
-          markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.child },
-          data: { bundle: false, type: 'child' },
+          // Remove pointer on edges that terminate at marriage point (intermediary structure)
+          // markerEnd removed intentionally
+          data: { bundle: false, type: 'parent-connector' },
         });
         allEdges.push({
           id: `e-${p2Id}-${marriagePointId}`,
@@ -327,8 +328,9 @@ function App() {
           targetHandle: 'top-target',
           type: 'smoothstep',
           style: { stroke: RELATIONSHIP_COLORS.child, strokeWidth: 2 },
-          markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.child },
-          data: { bundle: false, type: 'child' },
+          // Remove pointer on edges that terminate at marriage point (intermediary structure)
+          // markerEnd removed intentionally
+          data: { bundle: false, type: 'parent-connector' },
         });
 
         // Also add the spouse edge between the parents
@@ -351,7 +353,7 @@ function App() {
           markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.spouse },
         });
 
-        // Edges from marriage point to children
+  // Edges from marriage point to children
         for (const childId of commonChildren) {
           // Prefer an existing label from either parent relationship to the child (non-empty), otherwise default to 'child'
           const p1Rel = (p1.relationships || []).find(r => String((r.relative && r.relative._id) || r.relative) === String(childId));
@@ -370,10 +372,11 @@ function App() {
             labelBgPadding: [3, 4],
             labelBgBorderRadius: 4,
             style: { stroke: RELATIONSHIP_COLORS.child, strokeWidth: 2 },
+            // Keep pointer on marriagePoint -> child segment to indicate actual parent→child direction
             markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.child },
             // Surface a logical relationship so edge editor maps to a real DB relationship.
             // Map to the first parent by default (editing will operate on that relationship).
-            data: { type: 'child', label: labelText, from: p1Id, to: childId },
+            data: { type: 'child', label: labelText, from: p1Id, to: childId, fromMarriagePoint: true },
           });
         }
 
