@@ -1890,7 +1890,7 @@ function App() {
         showToast={showToast}
         onCollapse={() => setSidebarCollapsed(true)}
       />}
-      <main style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column' }}>
+  <main style={{ flex: 1, padding: '6px 12px 12px', display: 'flex', flexDirection: 'column' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0 }}>Family Tree Builder</h1>
           {/* Right-aligned action bar (restored). Only change: email is positioned above the Logout button */}
