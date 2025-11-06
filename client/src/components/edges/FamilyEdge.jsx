@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { getBezierPath, getSmoothStepPath, BaseEdge } from 'reactflow';
 
 /**
@@ -19,6 +19,7 @@ export default function FamilyEdge({
   markerEnd,
   selected,
 }) {
+  const [hovering, setHovering] = useState(false);
   const { type, label: dataLabel, virtual, renderStyle, fromMarriagePoint, bundleMember } = data;
   // Respect bundleMember flag (visual-only) which indicates this edge should hide its label.
   // Choose label from data first (preferred), fall back to the top-level edge label prop, then to the type for non-custom relationships.
@@ -74,8 +75,18 @@ export default function FamilyEdge({
     color: selected ? '#f59e0b' : edgeColor,
   } : undefined;
 
+  // Determine whether to show the hover tooltip: suppress for parent edge from parent to marriage point (not allowed)
+  const showHoverHint = useMemo(() => {
+    if (virtual) return false;
+    if (type === 'parent' && !fromMarriagePoint) {
+      // parent -> marriage point edges (our code draws these as parent with fromMarriagePoint=false)
+      return false;
+    }
+    return true;
+  }, [virtual, type, fromMarriagePoint]);
+
   return (
-    <>
+    <g onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
       <BaseEdge 
         id={id}
         path={edgePath} 
@@ -91,7 +102,10 @@ export default function FamilyEdge({
           selected={selected}
         />
       )}
-    </>
+      {hovering && showHoverHint && (
+        <EdgeHoverHint x={labelX} y={labelY - 14} />
+      )}
+    </g>
   );
 }
 
@@ -165,6 +179,39 @@ function EdgeLabel({ x, y, label, color, selected }) {
         fontSize={fontSize}
         fontWeight={600}
         fill="#111827"
+      >
+        {label}
+      </text>
+    </g>
+  );
+}
+
+function EdgeHoverHint({ x, y }) {
+  const label = 'double click to update';
+  const fontSize = 10;
+  const paddingX = 6;
+  const paddingY = 3;
+  const width = label.length * (fontSize * 0.6) + paddingX * 2;
+  const height = fontSize + paddingY * 2 + 2;
+  return (
+    <g transform={`translate(${x - width / 2}, ${y - height / 2})`}>
+      <rect
+        x={0}
+        y={0}
+        width={width}
+        height={height}
+        rx={6}
+        fill="rgba(17,24,39,0.86)"
+        stroke="rgba(255,255,255,0.2)"
+        strokeWidth={1}
+      />
+      <text
+        x={width / 2}
+        y={height / 2 + 3}
+        textAnchor="middle"
+        fontSize={fontSize}
+        fontWeight={600}
+        fill="#f1f5f9"
       >
         {label}
       </text>

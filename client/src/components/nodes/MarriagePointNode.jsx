@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 
 /**
@@ -6,6 +6,7 @@ import { Handle, Position } from 'reactflow';
  * Appears as a small circle between parents, connecting to children
  */
 export default function MarriagePointNode({ data, selected }) {
+  const [hovering, setHovering] = useState(false);
   const { label, parents = [], verified } = data;
 
   return (
@@ -15,6 +16,8 @@ export default function MarriagePointNode({ data, selected }) {
         width: 20,
         height: 20,
       }}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
     >
       {/* Connection handles */}
       <Handle 
@@ -61,6 +64,30 @@ export default function MarriagePointNode({ data, selected }) {
           {'⚭'}
         </span>
       </div>
+      {hovering && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -26,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(17,24,39,0.82)',
+            color: '#f1f5f9',
+            fontSize: 10,
+            fontWeight: 500,
+            padding: '2px 6px',
+            borderRadius: 6,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+            letterSpacing: '0.3px',
+            zIndex: 30,
+            animation: 'fadeIn 0.12s ease-out'
+          }}
+        >
+          double click to update
+        </div>
+      )}
     </div>
   );
 }

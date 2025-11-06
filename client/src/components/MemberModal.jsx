@@ -66,6 +66,35 @@ export default function MemberModal({
     }
   }, [open, member]);
 
+  // Global Escape-to-close handling: close in priority order -> photo popup, lightbox, main modal
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        if (photoEditOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          setPhotoEditOpen(false);
+          return;
+        }
+        if (lightboxOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          setLightboxOpen(false);
+          return;
+        }
+        if (open) {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose && onClose();
+        }
+      }
+    };
+    if (open || photoEditOpen || lightboxOpen) {
+      window.addEventListener('keydown', onKeyDown);
+      return () => window.removeEventListener('keydown', onKeyDown);
+    }
+  }, [open, photoEditOpen, lightboxOpen, onClose]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = { name: name.trim(), nickname: nickname.trim() };
@@ -87,7 +116,7 @@ export default function MemberModal({
 
   return (
     <div 
-      onClick={onClose}
+      onClick={() => { if (!photoEditOpen && !lightboxOpen) { onClose && onClose(); } }}
       style={{ 
         position: 'fixed', 
         inset: 0, 
@@ -700,7 +729,7 @@ export default function MemberModal({
         <div
           role="dialog"
           aria-modal="true"
-          onClick={() => setPhotoEditOpen(false)}
+          onClick={(e) => { e.stopPropagation(); setPhotoEditOpen(false); }}
           style={{
             position: 'fixed',
             inset: 0,

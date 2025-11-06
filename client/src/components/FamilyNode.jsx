@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Handle } from 'reactflow';
 
 const nodeStyle = {
@@ -23,6 +23,7 @@ const baseHandle = {
 };
 
 export default function FamilyNode({ id, data }) {
+  const [hovering, setHovering] = useState(false);
   // Swap: connected nodes should use Muted Grayish Blue; non-connected use Light Teal
   const connectedBg = '#C9D6DF'; // Muted Grayish Blue for connected nodes
   const nonConnectedBg = '#A0E8E0'; // Light Teal for non-connected nodes
@@ -30,7 +31,11 @@ export default function FamilyNode({ id, data }) {
   const nodeRuntimeStyle = { ...nodeStyle, background: isConnected ? connectedBg : nonConnectedBg, border: `1px solid ${isConnected ? '#9fb0bb' : '#7ccfca'}` };
 
   return (
-    <div style={{ position: 'relative', padding: 2 }}>
+    <div 
+      style={{ position: 'relative', padding: 2 }}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+    >
       {/* Top handles */}
       <Handle type="target" position="top" id="top-target" style={{ ...baseHandle, border: '1px solid #0f172a' }} />
       <Handle type="source" position="top" id="top-source" style={{ ...baseHandle, border: '1px solid #10b981' }} />
@@ -42,6 +47,31 @@ export default function FamilyNode({ id, data }) {
       <div style={nodeRuntimeStyle}>
         <div style={{ fontSize: 13, color: '#0f172a' }}>{data?.label ?? id}</div>
       </div>
+
+      {hovering && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -28,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(17,24,39,0.82)',
+            color: '#f1f5f9',
+            fontSize: 10,
+            fontWeight: 500,
+            padding: '2px 6px',
+            borderRadius: 6,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+            letterSpacing: '0.3px',
+            zIndex: 20,
+            animation: 'fadeIn 0.12s ease-out'
+          }}
+        >
+          double click to update
+        </div>
+      )}
 
       {/* Right handles */}
       <Handle type="source" position="right" id="right-source" style={{ ...baseHandle, border: '1px solid #10b981' }} />
