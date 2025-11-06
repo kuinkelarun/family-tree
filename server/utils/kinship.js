@@ -130,11 +130,11 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
   const { parentsOf, childrenOf, spousesOf, siblingsOf } = graphs;
   const depthLimit = options.depthLimit || 10;
   const a = String(A), b = String(B);
-  if (a === b) return { label: 'self', class: 'none', meta: {} };
+  if (a === b) return { label: 'self', class: 'none', meta: { relationCode: { type: 'self' } } };
 
   // Direct spouse relation (affinal)
   if ((spousesOf.get(a) || new Set()).has(b)) {
-    return { label: 'spouse', class: 'affinal', meta: { affinal: true } };
+    return { label: 'spouse', class: 'affinal', meta: { affinal: true, relationCode: { type: 'spouse' } } };
   }
 
   // Lineal (A relative to B):
@@ -143,14 +143,14 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
   if (downA.has(b)) {
     const d = downA.get(b);
     const label = linealLabel('up', d); // A is parent/grandparent of B
-    return { label, class: 'lineal', meta: { role: 'ancestor', steps: d } };
+    return { label, class: 'lineal', meta: { role: 'ancestor', steps: d, relationCode: { type: 'ancestor', level: d } } };
   }
   // If B is an ancestor of A, then A is a descendant of B (child/grandchild...).
   const upA = bfsUp(a, parentsOf, depthLimit);
   if (upA.has(b)) {
     const d = upA.get(b);
     const label = linealLabel('down', d); // A is child/grandchild of B
-    return { label, class: 'lineal', meta: { role: 'descendant', steps: d } };
+    return { label, class: 'lineal', meta: { role: 'descendant', steps: d, relationCode: { type: 'descendant', level: d } } };
   }
 
   // Siblings / half-siblings
@@ -159,11 +159,11 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
   const shared = intersectCount(pA, pB);
   if (shared > 0) {
     const half = shared === 1; // 2 => full siblings (or >2 in complex graphs)
-    return { label: half ? 'half-sibling' : 'sibling', class: 'collateral', meta: { half, sharedParents: shared } };
+    return { label: half ? 'half-sibling' : 'sibling', class: 'collateral', meta: { half, sharedParents: shared, relationCode: { type: 'sibling', half } } };
   }
   // If explicit sibling edge exists (without parent data), treat as sibling
   if ((siblingsOf.get(a) || new Set()).has(b)) {
-    return { label: 'sibling', class: 'collateral', meta: { explicit: true } };
+    return { label: 'sibling', class: 'collateral', meta: { explicit: true, relationCode: { type: 'sibling', half: false } } };
   }
 
   // Collateral via explicit siblings: aunt/uncle and niece/nephew through sibling-of-parent (or higher ancestors)
@@ -178,7 +178,7 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
   }
   if (bestAU) {
     const label = auntUncleLabel(bestAU.k);
-    return { label, class: 'collateral', meta: { viaAncestor: bestAU.anc, stepsUp: bestAU.k, kind: 'aunt-uncle' } };
+    return { label, class: 'collateral', meta: { viaAncestor: bestAU.anc, stepsUp: bestAU.k, kind: 'aunt-uncle', relationCode: { type: 'aunt_uncle', level: bestAU.k } } };
   }
 
   // Case 2: B is sibling of an ancestor of A => A is (great-)* niece/nephew of B
@@ -192,7 +192,7 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
   }
   if (bestNN) {
     const label = nieceNephewLabel(bestNN.k);
-    return { label, class: 'collateral', meta: { viaAncestor: bestNN.anc, stepsUp: bestNN.k, kind: 'niece-nephew' } };
+    return { label, class: 'collateral', meta: { viaAncestor: bestNN.anc, stepsUp: bestNN.k, kind: 'niece-nephew', relationCode: { type: 'niece_nephew', level: bestNN.k } } };
   }
 
   // Cousins via explicit sibling links between ancestors
@@ -223,13 +223,13 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
   if (bestCousin) {
     const ord = ordinalForDegree(bestCousin.degree);
     const label = bestCousin.removal === 0 ? `${ord} cousin` : `${ord} cousin ${removalLabel(bestCousin.removal)}`;
-    return { label, class: 'collateral', meta: { viaAncestors: [bestCousin.ancA, bestCousin.ancB], stepsUpA: bestCousin.kA, stepsUpB: bestCousin.kB, degree: bestCousin.degree, removal: bestCousin.removal } };
+    return { label, class: 'collateral', meta: { viaAncestors: [bestCousin.ancA, bestCousin.ancB], stepsUpA: bestCousin.kA, stepsUpB: bestCousin.kB, degree: bestCousin.degree, removal: bestCousin.removal, relationCode: { type: 'cousin', degree: bestCousin.degree, removal: bestCousin.removal } } };
   }
 
   // MRCA for collateral relations (aunt/uncle/niece/nephew/cousins)
   const mrca = findMRCA(a, b, parentsOf, depthLimit);
   if (!mrca) {
-    return { label: 'unrelated (by blood)', class: 'none', meta: {} };
+    return { label: 'unrelated (by blood)', class: 'none', meta: { relationCode: { type: 'unrelated' } } };
   }
 
   const { k, l, id: mrcaId } = mrca;
@@ -242,7 +242,8 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
     const greats = maxKL - 2;
     const base = isAuntUncle ? 'aunt/uncle' : 'niece/nephew';
     const label = greats > 0 ? `${'great-'.repeat(greats)}${base}` : base;
-    return { label, class: 'collateral', meta: { mrcaId, k, l, kind: isAuntUncle ? 'aunt-uncle' : 'niece-nephew', greats } };
+    const level = maxKL - 1; // 1=aunt/uncle or niece/nephew; 2=grand-...; >=3=great-...grand-...
+    return { label, class: 'collateral', meta: { mrcaId, k, l, kind: isAuntUncle ? 'aunt-uncle' : 'niece-nephew', greats, relationCode: { type: isAuntUncle ? 'aunt_uncle' : 'niece_nephew', level } } };
   }
 
   if (minKL >= 2) {
@@ -250,11 +251,11 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
     const removal = Math.abs(k - l);
     const ord = ordinalForDegree(degree);
     const label = removal === 0 ? `${ord} cousin` : `${ord} cousin ${removalLabel(removal)}`;
-    return { label, class: 'collateral', meta: { mrcaId, k, l, degree, removal } };
+    return { label, class: 'collateral', meta: { mrcaId, k, l, degree, removal, relationCode: { type: 'cousin', degree, removal } } };
   }
 
   // Fallback
-  return { label: 'related (undetermined collateral)', class: 'collateral', meta: { mrcaId, k, l } };
+  return { label: 'related (undetermined collateral)', class: 'collateral', meta: { mrcaId, k, l, relationCode: { type: 'related_undetermined' } } };
 }
 
 export function kinshipBetween(A, B, members, options = {}) {

@@ -15,7 +15,6 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/family_tree';
 
 async function run() {
-  const session = await mongoose.startSession();
   try {
     await mongoose.connect(MONGO_URI);
     console.log('Connected');
@@ -33,10 +32,15 @@ async function run() {
     // A -> parent B (but B does not have child A yet)
     a.relationships.push({ type: 'parent', relative: b._id });
 
-    await session.withTransaction(async () => {
-      await a.save({ session });
-      await normalizeMemberRelationships(session, a);
-    });
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await a.save({ session });
+        await normalizeMemberRelationships(session, a);
+      });
+    } finally {
+      await session.endSession();
+    }
 
     const freshA = await Member.findById(a._id).lean();
     const freshB = await Member.findById(b._id).lean();
@@ -49,7 +53,6 @@ async function run() {
   } catch (e) {
     console.error('Error:', e);
   } finally {
-    await session.endSession();
     await mongoose.disconnect();
   }
 }

@@ -1,6 +1,7 @@
 import FamilyTree from '../models/FamilyTree.js';
 import Member from '../models/Member.js';
 import { kinshipBetween } from '../utils/kinship.js';
+import { localizeKinship } from '../utils/kinshipLocalization.js';
 
 async function ensureTreeAccess(treeId, userId) {
   const tree = await FamilyTree.findById(treeId).lean();
@@ -22,8 +23,10 @@ export async function getKinshipBetween(req, res) {
     if (access.status !== 200) return res.status(access.status).json({ error: access.error });
 
     const members = await Member.find({ tree: treeId }).select('_id relationships').lean();
-    const result = kinshipBetween(from, to, members, { depthLimit: parseInt(req.query.depth || '10', 10) });
-    return res.json(result);
+  const locale = String(req.query.locale || 'en');
+  const result = kinshipBetween(from, to, members, { depthLimit: parseInt(req.query.depth || '10', 10) });
+  const localizedLabel = localizeKinship(result, locale);
+  return res.json({ ...result, localizedLabel, locale });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
@@ -45,8 +48,9 @@ export async function getKinshipMapForMember(req, res) {
     const out = [];
     for (const m of members) {
       if (String(m._id) === memberId) continue;
+      const locale = String(req.query.locale || 'en');
       const r = kinshipBetween(memberId, String(m._id), members, { depthLimit: limit });
-      out.push({ to: String(m._id), ...r });
+      out.push({ to: String(m._id), ...r, localizedLabel: localizeKinship(r, locale), locale });
     }
     return res.json({ count: out.length, relations: out });
   } catch (e) {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { displayMemberName } from '../utils/format.js';
 import { Trees } from '../utils/api.js';
 
@@ -10,6 +10,18 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
   const [resultAB, setResultAB] = useState(null);
   const [resultBA, setResultBA] = useState(null);
   const [error, setError] = useState('');
+  const [locale, setLocale] = useState(() => localStorage.getItem('ft_locale') || 'en');
+  useEffect(() => { localStorage.setItem('ft_locale', locale); }, [locale]);
+
+  // Re-run the query when locale changes and we already have results
+  useEffect(() => {
+    if (!a || !b) return;
+    if (!resultAB && !resultBA) return;
+    if (!canQuery || loading) return;
+    // Fetch localized labels for the newly selected locale
+    runQuery();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale]);
 
   const sortedMembers = useMemo(() => {
     return [...(members || [])].sort((x, y) => displayMemberName(x).localeCompare(displayMemberName(y)));
@@ -24,8 +36,8 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
       setResultAB(null);
       setResultBA(null);
       const [resAB, resBA] = await Promise.all([
-        Trees.kinship(treeId, a, b, depth),
-        Trees.kinship(treeId, b, a, depth),
+        Trees.kinship(treeId, a, b, depth, locale),
+        Trees.kinship(treeId, b, a, depth, locale),
       ]);
       setResultAB(resAB);
       setResultBA(resBA);
@@ -43,7 +55,7 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
           <h3 style={{ margin: 0, flex: 1 }}>Kinship Explorer</h3>
           <button onClick={onClose} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1' }}>Close</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto', gap: 8, marginTop: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto auto', gap: 8, marginTop: 12 }}>
           <select value={a} onChange={(e) => setA(e.target.value)} style={{ padding: 6 }}>
             <option value="">Member A…</option>
             {sortedMembers.map(m => (
@@ -57,6 +69,10 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
             ))}
           </select>
           <input type="number" min={1} max={20} value={depth} onChange={(e) => setDepth(parseInt(e.target.value || '10', 10))} style={{ width: 80, padding: 6 }} />
+          <select value={locale} onChange={(e) => setLocale(e.target.value)} style={{ padding: 6 }}>
+            <option value="en">English</option>
+            <option value="np">Nepali</option>
+          </select>
           <button disabled={!canQuery || !a || !b || loading} onClick={runQuery} style={{ padding: '6px 10px', borderRadius: 6, background: (!canQuery || !a || !b) ? '#94a3b8' : '#1f6feb', color: '#fff', border: 'none' }}>Check</button>
         </div>
         {error && <div style={{ marginTop: 10, color: '#b91c1c' }}>{error}</div>}
@@ -65,22 +81,36 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
           <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
             {resultAB && (
               <div style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}>
-                <div style={{ marginBottom: 4 }}>
-                  <strong>{displayMemberName(members.find(m => String(m._id) === String(a)) || {}) || 'A'}</strong> is
-                  {' '}<strong>{resultAB.label}</strong>{' '}of{' '}
-                  <strong>{displayMemberName(members.find(m => String(m._id) === String(b)) || {}) || 'B'}</strong>
+                <div style={{ marginBottom: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span>
+                    <strong>{displayMemberName(members.find(m => String(m._id) === String(a)) || {}) || 'A'}</strong> is{' '}
+                    <strong>{locale === 'en' ? resultAB.label : (resultAB.localizedLabel || resultAB.label)}</strong>{' '}of{' '}
+                    <strong>{displayMemberName(members.find(m => String(m._id) === String(b)) || {}) || 'B'}</strong>
+                  </span>
+                  {locale !== 'en' && resultAB.localizedLabel && (
+                    <span style={{ fontSize: 12, color: '#475569' }}>
+                      (EN: {resultAB.label})
+                    </span>
+                  )}
                 </div>
-                <div style={{ color: '#475569' }}>Class: {resultAB.class}</div>
+                <div style={{ color: '#475569', fontSize: 12 }}>Class: {resultAB.class}</div>
               </div>
             )}
             {resultBA && (
               <div style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}>
-                <div style={{ marginBottom: 4 }}>
-                  <strong>{displayMemberName(members.find(m => String(m._id) === String(b)) || {}) || 'B'}</strong> is
-                  {' '}<strong>{resultBA.label}</strong>{' '}of{' '}
-                  <strong>{displayMemberName(members.find(m => String(m._id) === String(a)) || {}) || 'A'}</strong>
+                <div style={{ marginBottom: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span>
+                    <strong>{displayMemberName(members.find(m => String(m._id) === String(b)) || {}) || 'B'}</strong> is{' '}
+                    <strong>{locale === 'en' ? resultBA.label : (resultBA.localizedLabel || resultBA.label)}</strong>{' '}of{' '}
+                    <strong>{displayMemberName(members.find(m => String(m._id) === String(a)) || {}) || 'A'}</strong>
+                  </span>
+                  {locale !== 'en' && resultBA.localizedLabel && (
+                    <span style={{ fontSize: 12, color: '#475569' }}>
+                      (EN: {resultBA.label})
+                    </span>
+                  )}
                 </div>
-                <div style={{ color: '#475569' }}>Class: {resultBA.class}</div>
+                <div style={{ color: '#475569', fontSize: 12 }}>Class: {resultBA.class}</div>
               </div>
             )}
           </div>
