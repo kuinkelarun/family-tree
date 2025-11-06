@@ -24,12 +24,12 @@ const initialNodes = [
 ];
 
 const initialEdges = [
-  // spouse: single direction pointing to target
+  // Spouse: horizontal left/right handles will be assigned after drag; leave handles undefined
   { id: 'e1', source: 'me', target: 'spouse', type: 'smoothstep', label: 'spouse', markerEnd: { type: 'arrowclosed', color: '#111827' } },
-  // parent: single pointer to target
-  { id: 'e2', source: 'me', target: 'child1', type: 'smoothstep', label: 'parent', markerEnd: { type: 'arrowclosed', color: '#111827' } },
-  { id: 'e3', source: 'spouse', target: 'child1', type: 'smoothstep', label: 'parent', markerEnd: { type: 'arrowclosed', color: '#111827' } },
-  { id: 'e4', source: 'parent', target: 'me', type: 'smoothstep', label: 'parent', markerEnd: { type: 'arrowclosed', color: '#111827' } },
+  // Parent relationships (source is parent). Enforce top-source -> bottom-target per user rules.
+  { id: 'e2', source: 'me', target: 'child1', type: 'smoothstep', label: 'parent', sourceHandle: 'top-source', targetHandle: 'bottom-target', markerEnd: { type: 'arrowclosed', color: '#111827' } },
+  { id: 'e3', source: 'spouse', target: 'child1', type: 'smoothstep', label: 'parent', sourceHandle: 'top-source', targetHandle: 'bottom-target', markerEnd: { type: 'arrowclosed', color: '#111827' } },
+  { id: 'e4', source: 'parent', target: 'me', type: 'smoothstep', label: 'parent', sourceHandle: 'top-source', targetHandle: 'bottom-target', markerEnd: { type: 'arrowclosed', color: '#111827' } },
 ];
 
 export default function TreeBoard({ 
@@ -47,6 +47,9 @@ export default function TreeBoard({
   canAdd = true,
   onDropMember, // NEW: callback when member is dropped from sidebar
   onRfReady, // callback to expose react-flow instance to parent
+  onAutoLayout, // trigger layered auto layout or revert
+  layoutActive = false, // if true, button will say "Revert Layout"
+  layoutBusy = false,
 }) {
   const controlled = Array.isArray(extNodes) && Array.isArray(extEdges);
   const [nodesLocal, setNodesLocal, onNodesChangeLocal] = useNodesState(initialNodes);
@@ -362,6 +365,42 @@ export default function TreeBoard({
     if (onNodeDragStop) onNodeDragStop(node);
     // Clear guides after finishing drag
     setAlignGuides({ x: null, y: null });
+
+    // After manual repositioning, update edge handles to reflect orientation rules:
+    // - spouse & sibling: left/right based on horizontal position
+    // - child (parent->child): always bottom-source (parent) -> top-target (child)
+    try {
+      const rfNodes = (rfInstance && typeof rfInstance.getNodes === 'function') ? rfInstance.getNodes() : nodes;
+      const pos = new Map((rfNodes || []).map(n => [String(n.id), n.position || { x: 0, y: 0 }]));
+      setEdges((eds) => eds.map((e) => {
+        // Relationship type can be stored in e.data.type OR just in the label.
+        // Some existing edges (legacy / initial) only have a label like 'parent' or 'spouse'.
+        // Fallback to label so orientation logic always runs.
+        const tData = String(e?.data?.type || '').toLowerCase();
+        const rel = tData || String(e?.label || '').toLowerCase();
+        const sp = pos.get(String(e.source));
+        const tp = pos.get(String(e.target));
+        if (!sp || !tp) return e;
+        if (rel === 'spouse' || rel === 'sibling') {
+          const dx = (tp.x || 0) - (sp.x || 0);
+          const srcRight = dx >= 0;
+            const sourceHandle = `${srcRight ? 'right' : 'left'}-source`;
+            const targetHandle = `${srcRight ? 'left' : 'right'}-target`;
+          if (e.sourceHandle === sourceHandle && e.targetHandle === targetHandle) return e;
+          return { ...e, sourceHandle, targetHandle };
+        }
+        if (rel === 'parent' || rel === 'child') {
+          // Enforce vertical orientation with direction based on relationship type
+          const sourceHandle = (rel === 'child') ? 'bottom-source' : 'top-source';
+          const targetHandle = (rel === 'child') ? 'top-target' : 'bottom-target';
+          if (e.sourceHandle === sourceHandle && e.targetHandle === targetHandle) return e;
+          return { ...e, sourceHandle, targetHandle };
+        }
+        return e;
+      }));
+    } catch (err) {
+      // ignore handle alignment errors
+    }
   }, [nodes, onNodeDragStop]);
 
   // Allow updating an edge by dragging its handle to another node
@@ -528,6 +567,9 @@ export default function TreeBoard({
         <button onClick={addPerson} disabled={!canAdd} style={{ padding: '6px 10px', borderRadius: 6, background: canAdd ? '#1f6feb' : '#94a3b8', color: '#fff', border: 'none', cursor: canAdd ? 'pointer' : 'not-allowed' }}>
           + Add Node
         </button>
+        <button onClick={onAutoLayout} disabled={layoutBusy} style={{ padding: '6px 10px', borderRadius: 6, background: layoutBusy ? '#94a3b8' : '#475569', color: '#fff', border: 'none' }}>
+          {layoutBusy ? 'Applying…' : (layoutActive ? 'Revert Layout' : 'Auto Layout')}
+        </button>
         <span style={{ color: '#64748b', fontSize: 12, flex: '1 1 0', minWidth: 0 }}>
           Drag to pan, scroll to zoom, connect nodes to add edges
         </span>
@@ -569,7 +611,8 @@ export default function TreeBoard({
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
-        nodeTypes={nodeTypes}
+        // Make the identity rock-solid for React Flow by memoizing
+        nodeTypes={React.useMemo(() => nodeTypes, [])}
         onEdgeUpdate={onEdgeUpdate}
         connectionLineType="smoothstep"
         connectionMode="loose"

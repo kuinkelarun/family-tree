@@ -73,3 +73,10 @@ This backlog captures planned work items, priorities, and short implementation n
 ---
 
 *Created on 2025-11-04* 
+
+
+
+======================
+Can we display direction indicators (arrows) on the edge connecting two spouse nodes?
+
+Currently, when two nodes are connected as spouses, the edge direction pointers are removed once a marriage point is created (for example, when adding a child). It would be helpful to retain or reintroduce the edge direction indicators even after the marriage point is established, so the relationship remains visually consistent and clear.

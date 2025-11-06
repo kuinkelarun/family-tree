@@ -85,6 +85,8 @@ export const relationshipSchema = z.object({
   toMemberId: z.string().min(1),
   type: z.enum(['parent', 'child', 'spouse', 'sibling', 'custom']),
   label: z.string().optional(),
+  // authored is implicit client-side; allow optional boolean for future bulk imports
+  authored: z.boolean().optional(),
 });
 
 export const relationshipUpdateSchema = z.object({
@@ -93,6 +95,7 @@ export const relationshipUpdateSchema = z.object({
   type: z.enum(['parent', 'child', 'spouse', 'sibling', 'custom']), // current type to locate
   newType: z.enum(['parent', 'child', 'spouse', 'sibling', 'custom']).optional(),
   label: z.string().optional(), // new label (for custom or override)
+  authored: z.boolean().optional(), // allow toggling authored in future if needed
 });
 
 export const relationshipDeleteSchema = z.object({

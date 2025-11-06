@@ -24,12 +24,12 @@ export async function addRelationship(req, res) {
 
       // Add directionally and ensure reciprocal where appropriate
       if (!Array.isArray(from.relationships)) from.relationships = [];
-      from.relationships.push({ relative: to._id, type, label });
+  from.relationships.push({ relative: to._id, type, label, authored: true });
       if (!Array.isArray(to.relationships)) to.relationships = [];
-      if (type === 'parent') to.relationships.push({ relative: from._id, type: 'child' });
-      else if (type === 'child') to.relationships.push({ relative: from._id, type: 'parent' });
-      else if (type === 'spouse') to.relationships.push({ relative: from._id, type: 'spouse' });
-      else if (type === 'sibling') to.relationships.push({ relative: from._id, type: 'sibling' });
+  if (type === 'parent') to.relationships.push({ relative: from._id, type: 'child' });
+  else if (type === 'child') to.relationships.push({ relative: from._id, type: 'parent' });
+  else if (type === 'spouse') to.relationships.push({ relative: from._id, type: 'spouse' });
+  else if (type === 'sibling') to.relationships.push({ relative: from._id, type: 'sibling' });
 
       await from.save(session ? { session } : undefined);
       await to.save(session ? { session } : undefined);
@@ -86,7 +86,9 @@ export async function updateRelationship(req, res) {
 
       // update from side
       const nextType = newType || type;
-      from.relationships[idx].type = nextType;
+  from.relationships[idx].type = nextType;
+  // Preserve authored flag on original side; if user changes type it remains authored
+  if (typeof from.relationships[idx].authored !== 'boolean') from.relationships[idx].authored = true;
       if (typeof label !== 'undefined') from.relationships[idx].label = label;
 
       // update reciprocal on 'to' side for supported types
@@ -99,7 +101,8 @@ export async function updateRelationship(req, res) {
       if (nextRecip) {
         // ensure new reciprocal exists
         to.relationships = to.relationships || [];
-        to.relationships.push({ relative: from._id, type: nextRecip });
+  // Reciprocal is system-generated; do not mark authored
+  to.relationships.push({ relative: from._id, type: nextRecip });
       }
 
       await from.save(session ? { session } : undefined);

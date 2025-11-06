@@ -39,6 +39,10 @@ function App() {
   const [treeMeta, setTreeMeta] = useState(null);
   const [showKinship, setShowKinship] = useState(false);
   const rfApiRef = useRef(null);
+  const elkWorkerRef = useRef(null);
+  const [layoutActive, setLayoutActive] = useState(false);
+  const [layoutBusy, setLayoutBusy] = useState(false);
+  const prevPositionsRef = useRef(null); // { positions: { id -> {x,y} }, viewport }
   
 
   async function checkApi() {
@@ -53,7 +57,6 @@ function App() {
 
   // Helpers
   const isAuthed = useMemo(() => !!token, [token]);
-
   async function handleRegister() {
     try {
       const { token: t } = await Auth.register(email, password);
@@ -91,6 +94,7 @@ function App() {
       const t = `My Tree ${new Date().toLocaleString()}`;
       const tree = await Trees.create(t);
       setTreeIdState(tree._id);
+
       setTreeId(tree._id);
       await loadTree(tree._id);
       await loadMyTrees();
@@ -344,6 +348,7 @@ function App() {
           labelBgPadding: [3, 4],
           labelBgBorderRadius: 4,
           style: { stroke: RELATIONSHIP_COLORS.spouse, strokeWidth: 2 },
+          markerEnd: { type: 'arrowclosed', color: RELATIONSHIP_COLORS.spouse },
         });
 
         // Edges from marriage point to children
@@ -412,38 +417,69 @@ function App() {
         const dx = (dstPos.x || 0) - (srcPos.x || 0);
         const dy = (dstPos.y || 0) - (srcPos.y || 0);
 
-        let sourceHandle, targetHandle;
-        if (type === 'parent') {
-          sourceHandle = 'top-source';
-          targetHandle = 'bottom-target';
-        } else if (type === 'child') {
-          sourceHandle = 'bottom-source';
-          targetHandle = 'top-target';
+  let sourceHandle, targetHandle;
+
+        const markers = { markerEnd: { type: 'arrowclosed', color: edgeColor } };
+
+        // Decide edge endpoints, type, label, and handles
+        let edgeSourceId = displaySourceId;
+        let edgeTargetId = displayTargetId;
+        let edgeType = type;
+        let edgeLabel = label || type;
+
+        if (type === 'parent' || type === 'child') {
+          // Preserve authored direction. If BOTH reciprocal sides are present and neither authored, prefer the side whose source is visually above.
+          const srcRelAuthored = !!r.authored;
+          let prefer = true;
+          if (!srcRelAuthored && current && !current.authored) {
+            // Neither side authored: pick the edge whose source y < target y for consistency
+            const sPos = posById.get(displaySourceId) || { y: 0 };
+            const tPos = posById.get(displayTargetId) || { y: 0 };
+            prefer = sPos.y <= tPos.y; // source above or same
+          }
+          if (prefer) {
+            edgeSourceId = displaySourceId;
+            edgeTargetId = displayTargetId;
+            edgeType = type;
+            edgeLabel = label || type;
+            if (type === 'child') {
+              sourceHandle = 'bottom-source';
+              targetHandle = 'top-target';
+            } else {
+              sourceHandle = 'top-source';
+              targetHandle = 'bottom-target';
+            }
+          } else {
+            // Skip adding this candidate if we don't prefer it
+            // by continuing without touching pairMap (acts like a filtered-out duplicate)
+            continue;
+          }
         } else if (type === 'spouse' || type === 'sibling') {
+          // Side connectors based on horizontal position
           const srcRight = dx >= 0;
           sourceHandle = `${srcRight ? 'right' : 'left'}-source`;
-          targetHandle = `${!srcRight ? 'right' : 'left'}-target`;
+          targetHandle = `${srcRight ? 'left' : 'right'}-target`;
         } else {
+          // Fallback: choose by dominant axis
           if (Math.abs(dx) >= Math.abs(dy)) {
             const srcRight = dx >= 0;
             sourceHandle = `${srcRight ? 'right' : 'left'}-source`;
-            targetHandle = `${!srcRight ? 'right' : 'left'}-target`;
+            targetHandle = `${srcRight ? 'left' : 'right'}-target`;
           } else {
             const srcDown = dy >= 0;
             sourceHandle = `${srcDown ? 'bottom' : 'top'}-source`;
-            targetHandle = `${!srcDown ? 'bottom' : 'top'}-target`;
+            targetHandle = `${srcDown ? 'top' : 'bottom'}-target`;
           }
         }
 
-        const markers = { markerEnd: { type: 'arrowclosed', color: edgeColor } };
-        const edgeId = `${String(src)}-${String(dst)}-${type}`;
+        const edgeId = `${String(edgeSourceId)}-${String(edgeTargetId)}-${edgeType}`;
 
         const candidate = {
           id: edgeId,
-          source: displaySourceId,
-          target: displayTargetId,
+          source: edgeSourceId,
+          target: edgeTargetId,
           type: 'smoothstep',
-          label,
+          label: edgeLabel,
           sourceHandle,
           targetHandle,
           labelStyle: { fill: '#111827', fontSize: 12, fontWeight: 600 },
@@ -452,34 +488,29 @@ function App() {
           labelBgBorderRadius: 4,
           style: { stroke: edgeColor, strokeWidth: 2 },
           ...markers,
-          data: { type, label, authored, from: String(src), to: String(dst) },
+          data: { type: edgeType, label: edgeLabel, authored: !!r.authored, from: String(edgeSourceId), to: String(edgeTargetId) },
         };
 
         if (!current) {
-          pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, authored, type, src: String(src), dst: String(dst) });
+          pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, authored: !!r.authored, type, src: String(src), dst: String(dst) });
         } else {
           let preferThis = false;
           if (type === 'parent' || type === 'child') {
-            // For directional parent/child pairs, avoid flipping direction based on label changes.
-            // Prefer authored over non-authored. If same authored status:
-            // - If same type, allow upgrading to the candidate only to pick up a new label.
-            // - If different types (parent vs child), keep current to preserve direction.
-            if (authored && !current.authored) preferThis = true;
-            else if (!authored && current.authored) preferThis = false;
-            else if (type === current.type) preferThis = (!!r.label && !current.hasLabel);
+            // New simpler preference: authored beats unauthored; otherwise keep existing.
+            if (!!r.authored && !current.authored) preferThis = true;
             else preferThis = false;
           } else if (type === 'sibling' || type === 'spouse') {
-            if (authored && !current.authored) preferThis = true;
-            else if (!authored && current.authored) preferThis = false;
+            if (!!r.authored && !current.authored) preferThis = true;
+            else if (!r.authored && current.authored) preferThis = false;
             else if (!!r.label && !current.hasLabel) preferThis = true;
             else if (!r.label && current.hasLabel) preferThis = false;
             else preferThis = false;
           } else {
-            preferThis = (authored && !current.authored) || (!!r.label && !current.hasLabel);
+            preferThis = (!!r.authored && !current.authored) || (!!r.label && !current.hasLabel);
           }
-          
+
           if (preferThis) {
-            pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, authored, type, src: String(src), dst: String(dst) });
+            pairMap.set(sortedKey, { edge: candidate, hasLabel: !!r.label, authored: !!r.authored, type, src: String(src), dst: String(dst) });
           }
         }
       }
@@ -596,6 +627,568 @@ function App() {
     }
   }
 
+  // Trigger layered (Sugiyama) layout via ELK worker and apply positions to current nodes.
+  // If layout is already active, revert to previous positions.
+  async function handleAutoLayout() {
+    try {
+      if (layoutBusy) return; // prevent concurrent clicks
+      setLayoutBusy(true);
+      // If currently active, revert to saved positions
+      if (layoutActive && prevPositionsRef.current) {
+        const prev = prevPositionsRef.current;
+        setNodes((nds) => nds.map((n) => {
+          const p = prev.positions?.[String(n.id)];
+          return p ? { ...n, position: { x: p.x, y: p.y } } : n;
+        }));
+        setLayoutActive(false);
+        // Restore previous viewport if available; otherwise fit
+        try {
+          const vp = prev.viewport;
+          if (vp && rfApiRef.current?.setViewport) {
+            rfApiRef.current.setViewport(vp, { duration: 0 });
+          } else {
+            rfApiRef.current?.fitView?.({ padding: 0.1 });
+          }
+        } catch (e) {}
+        // keep history cleared after revert
+        prevPositionsRef.current = null;
+        setLayoutBusy(false);
+        showToast('Restored previous layout');
+        return;
+      }
+
+      // Save current positions for revert
+      const liveNodes = (rfApiRef.current && typeof rfApiRef.current.getNodes === 'function')
+        ? rfApiRef.current.getNodes()
+        : nodes;
+      const positions = {};
+      (liveNodes || []).forEach((n) => {
+        const pos = (n && n.position) ? n.position : { x: 0, y: 0 };
+        positions[String(n.id)] = { x: Number(pos.x) || 0, y: Number(pos.y) || 0 };
+      });
+      let viewport = null;
+  try { viewport = rfApiRef.current?.getViewport?.() || null; } catch (e) {}
+      prevPositionsRef.current = { positions, viewport };
+
+      // Lazy-create worker
+      if (!elkWorkerRef.current) {
+        elkWorkerRef.current = new Worker(new URL('./workers/elkWorker.js', import.meta.url), { type: 'module' });
+      }
+      const worker = elkWorkerRef.current;
+
+      // Get measured nodes (width/height) from React Flow if available, and ensure
+      // helper nodes like marriagePoint are included even if not measured yet.
+      const rfNodes = (rfApiRef.current && typeof rfApiRef.current.getNodes === 'function')
+        ? rfApiRef.current.getNodes()
+        : nodes.map(n => ({ ...n }));
+      const rfNodeMap = new Map((rfNodes || []).map(n => [String(n.id), n]));
+      const allNodeIds = new Set([...(rfNodes || []).map(n => String(n.id)), ...(nodes || []).map(n => String(n.id))]);
+      const allNodesForLayout = Array.from(allNodeIds).map(id => {
+        const snap = rfNodeMap.get(id) || (nodes || []).find(n => String(n.id) === id) || {};
+        const w = Number.isFinite(snap.width) ? snap.width : 160;
+        const h = Number.isFinite(snap.height) ? snap.height : 80;
+        return { id, width: w, height: h };
+      });
+
+      const graph = {
+        nodes: allNodesForLayout,
+        // ELK requires both endpoints to exist as children; filter any dangling edges
+        edges: (edges || [])
+          .filter(e => allNodeIds.has(String(e.source)) && allNodeIds.has(String(e.target)))
+          // Only include hierarchical edges in layout (parent/child and marriage edges)
+          .filter(e => {
+            const t = String(e?.data?.type || e?.label || 'custom').toLowerCase();
+            return t === 'parent' || t === 'child';
+          })
+          .map(e => ({
+            id: String(e.id || `${e.source}-${e.target}`),
+            source: String(e.source),
+            target: String(e.target),
+            // pass type for port-side mapping
+            type: String(e?.data?.type || e?.label || 'custom'),
+          })),
+        // Provide in-layer constraints: sibling ordering and spouse grouping/order
+        orderConstraints: (() => {
+          try {
+            const memById = new Map((members || []).map(m => [String(m._id), m]));
+            const toConstraints = [];
+
+            // 1) Sibling groups under each marriage node (children of m-...)
+            const byMarriage = new Map();
+            for (const ed of (edges || [])) {
+              if (String(ed?.data?.type || '').toLowerCase() !== 'child') continue;
+              const src = String(ed.source || '');
+              const tgt = String(ed.target || '');
+              if (src.startsWith('m-')) {
+                if (!byMarriage.has(src)) byMarriage.set(src, new Set());
+                byMarriage.get(src).add(tgt);
+              }
+            }
+            for (const [, set] of byMarriage.entries()) {
+              const ids = Array.from(set);
+              if (ids.length <= 1) continue;
+              ids.sort((a, b) => {
+                const A = memById.get(String(a)) || {};
+                const B = memById.get(String(b)) || {};
+                const da = A.dob ? new Date(A.dob).getTime() : NaN;
+                const db = B.dob ? new Date(B.dob).getTime() : NaN;
+                if (Number.isFinite(da) && Number.isFinite(db) && da !== db) return da - db;
+                const na = (A.name || '').localeCompare?.(B.name || '') || 0;
+                if (na) return na;
+                const ca = A.createdAt ? new Date(A.createdAt).getTime() : NaN;
+                const cb = B.createdAt ? new Date(B.createdAt).getTime() : NaN;
+                if (Number.isFinite(ca) && Number.isFinite(cb) && ca !== cb) return ca - cb;
+                return String(a).localeCompare(String(b));
+              });
+              toConstraints.push({ type: 'SAME_LAYER', ids });
+              toConstraints.push({ type: 'ORDER', ids });
+            }
+
+            // 1b) Fallback: Sibling groups by shared parent when no marriage point
+            // Build children lists from member relationships to capture single-parent families
+            const childrenByParent = new Map(); // parentId -> Set(childIds)
+            for (const [mid, m] of memById.entries()) {
+              for (const r of (m.relationships || [])) {
+                if (String(r?.type) !== 'child') continue;
+                const childId = String((r?.relative && r.relative._id) || r?.relative || '');
+                if (!childId) continue;
+                // only consider nodes present on the canvas
+                if (!allNodeIds.has(childId)) continue;
+                if (!childrenByParent.has(mid)) childrenByParent.set(mid, new Set());
+                childrenByParent.get(mid).add(childId);
+              }
+            }
+            for (const [, set] of childrenByParent.entries()) {
+              const ids = Array.from(set).filter(id => allNodeIds.has(id));
+              if (ids.length <= 1) continue;
+              ids.sort((a, b) => {
+                const A = memById.get(String(a)) || {};
+                const B = memById.get(String(b)) || {};
+                const da = A.dob ? new Date(A.dob).getTime() : NaN;
+                const db = B.dob ? new Date(B.dob).getTime() : NaN;
+                if (Number.isFinite(da) && Number.isFinite(db) && da !== db) return da - db;
+                const na = (A.name || '').localeCompare?.(B.name || '') || 0;
+                if (na) return na;
+                const ca = A.createdAt ? new Date(A.createdAt).getTime() : NaN;
+                const cb = B.createdAt ? new Date(B.createdAt).getTime() : NaN;
+                if (Number.isFinite(ca) && Number.isFinite(cb) && ca !== cb) return ca - cb;
+                return String(a).localeCompare(String(b));
+              });
+              toConstraints.push({ type: 'SAME_LAYER', ids });
+              toConstraints.push({ type: 'ORDER', ids });
+            }
+
+            // 2) Spouse pairs: SAME_LAYER and a deterministic ORDER
+            const spousePairs = new Set();
+            for (const ed of (edges || [])) {
+              if (String(ed?.data?.type || '').toLowerCase() !== 'spouse') continue;
+              const a = String(ed.source || '');
+              const b = String(ed.target || '');
+              if (!allNodeIds.has(a) || !allNodeIds.has(b)) continue;
+              const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+              spousePairs.add(key);
+            }
+            for (const key of spousePairs) {
+              const [a, b] = key.split('|');
+              const ma = memById.get(a) || {};
+              const mb = memById.get(b) || {};
+              // Deterministic order: by name, fallback to id
+              const order = ((ma.name || '').localeCompare?.(mb.name || '') || 0) <= 0 ? [a, b] : [b, a];
+              toConstraints.push({ type: 'SAME_LAYER', ids: [a, b] });
+              toConstraints.push({ type: 'ORDER', ids: order });
+            }
+
+            // 3) Sibling components from explicit sibling edges (works even without parents/marriage)
+            const adj = new Map(); // id -> Set(id)
+            for (const ed of (edges || [])) {
+              if (String(ed?.data?.type || '').toLowerCase() !== 'sibling') continue;
+              const a = String(ed.source || '');
+              const b = String(ed.target || '');
+              if (!allNodeIds.has(a) || !allNodeIds.has(b)) continue;
+              if (!adj.has(a)) adj.set(a, new Set());
+              if (!adj.has(b)) adj.set(b, new Set());
+              adj.get(a).add(b);
+              adj.get(b).add(a);
+            }
+            const visited = new Set();
+            for (const v of adj.keys()) {
+              if (visited.has(v)) continue;
+              const comp = [];
+              const stack = [v];
+              visited.add(v);
+              while (stack.length) {
+                const u = stack.pop();
+                comp.push(u);
+                for (const w of (adj.get(u) || [])) {
+                  if (visited.has(w)) continue;
+                  visited.add(w);
+                  stack.push(w);
+                }
+              }
+              if (comp.length > 1) {
+                comp.sort((a, b) => {
+                  const A = memById.get(String(a)) || {};
+                  const B = memById.get(String(b)) || {};
+                  const da = A.dob ? new Date(A.dob).getTime() : NaN;
+                  const db = B.dob ? new Date(B.dob).getTime() : NaN;
+                  if (Number.isFinite(da) && Number.isFinite(db) && da !== db) return da - db;
+                  const na = (A.name || '').localeCompare?.(B.name || '') || 0;
+                  if (na) return na;
+                  const ca = A.createdAt ? new Date(A.createdAt).getTime() : NaN;
+                  const cb = B.createdAt ? new Date(B.createdAt).getTime() : NaN;
+                  if (Number.isFinite(ca) && Number.isFinite(cb) && ca !== cb) return ca - cb;
+                  return String(a).localeCompare(String(b));
+                });
+                toConstraints.push({ type: 'SAME_LAYER', ids: comp });
+                toConstraints.push({ type: 'ORDER', ids: comp });
+              }
+            }
+
+            return toConstraints;
+          } catch { return []; }
+        })(),
+      };
+
+      // Dev-only diagnostics to verify layout inputs
+      try {
+        if (import.meta?.env?.MODE !== 'production') {
+          const marriageCount = Array.from(allNodeIds).filter(id => id.startsWith('m-')).length;
+          // eslint-disable-next-line no-console
+          console.info('[AutoLayout] nodes:', graph.nodes.length, 'marriages:', marriageCount, 'hierEdges:', graph.edges.length);
+        }
+      } catch {}
+
+      const options = {
+        direction: 'DOWN',
+        nodePlacement: 'NETWORK_SIMPLEX',
+        edgeRouting: 'POLYLINE',
+        spacingNodeNode: 56,
+        spacingBetweenLayers: 100,
+        spacingEdgeNodeBetweenLayers: 24,
+        defaultNodeWidth: 160,
+        defaultNodeHeight: 80,
+      };
+
+      const layoutPositions = await new Promise((resolve, reject) => {
+        const onMsg = (ev) => {
+          const data = ev?.data || {};
+          if (data.type !== 'layout-result') return;
+          worker.removeEventListener('message', onMsg);
+          if (data.error) reject(new Error(data.error));
+          else resolve(data.positions || {});
+        };
+        worker.addEventListener('message', onMsg);
+        worker.postMessage({ type: 'layout', graph, options });
+      });
+
+      // Post-process: generation inference + vertical leveling
+      try {
+        const memById = new Map((members || []).map(m => [String(m._id), m]));
+        // Infer missing generation values from parent/child edges (parent = source, child = target)
+        const genMap = new Map();
+        for (const [id, m] of memById.entries()) {
+          const g = Number(m?.generation);
+          if (Number.isFinite(g)) genMap.set(String(id), g);
+        }
+        const pcPairs = [];
+        for (const ed of (graph.edges || [])) {
+          const t = String(ed?.type || '').toLowerCase();
+          if (t !== 'child') continue;
+          const p = String(ed.source);
+          const c = String(ed.target);
+          if (p.startsWith('m-') || c.startsWith('m-')) continue;
+          pcPairs.push([p, c]);
+        }
+        let changed = true, rounds = 0;
+        while (changed && rounds++ < 10) {
+          changed = false;
+          for (const [p, c] of pcPairs) {
+            const gp = genMap.get(p);
+            const gc = genMap.get(c);
+            if (gp != null && gc == null) { genMap.set(c, gp + 1); changed = true; }
+            else if (gp == null && gc != null) { genMap.set(p, gc - 1); changed = true; }
+          }
+        }
+        const hierDegree = new Map(); // nodeId -> count of hierarchical edges (parent/child) touching it
+        (graph.edges || []).forEach(ed => {
+          const s = String(ed.source);
+          const t = String(ed.target);
+          hierDegree.set(s, (hierDegree.get(s) || 0) + 1);
+          hierDegree.set(t, (hierDegree.get(t) || 0) + 1);
+        });
+        // Compute anchored Y per generation from nodes that participate in hierarchy
+        const yByGen = new Map(); // gen -> array of y
+        for (const [id, pos] of Object.entries(layoutPositions)) {
+          if (String(id).startsWith('m-')) continue; // skip marriage helpers
+          const deg = hierDegree.get(String(id)) || 0;
+          if (deg <= 0) continue;
+          const memGen = Number(memById.get(String(id))?.generation);
+          const gen = Number.isFinite(memGen) ? memGen : (genMap.has(String(id)) ? genMap.get(String(id)) : NaN);
+          if (!Number.isFinite(gen)) continue;
+          if (!yByGen.has(gen)) yByGen.set(gen, []);
+          yByGen.get(gen).push(Number(pos.y) || 0);
+        }
+        const anchoredY = new Map(); // gen -> median y
+        for (const [gen, arr] of yByGen.entries()) {
+          const sorted = arr.slice().sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          const val = sorted.length ? (sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2) : undefined;
+          if (Number.isFinite(val)) anchoredY.set(gen, val);
+        }
+        // If no anchored value for a generation, optionally derive from nearest known generation
+        const knownGens = Array.from(anchoredY.keys()).sort((a, b) => a - b);
+        function nearestAnchored(gen) {
+          if (!knownGens.length || !Number.isFinite(gen)) return undefined;
+          let best = knownGens[0];
+          let bestDist = Math.abs(gen - best);
+          for (const g of knownGens) {
+            const d = Math.abs(gen - g);
+            if (d < bestDist) { best = g; bestDist = d; }
+          }
+          return anchoredY.get(best);
+        }
+        // Adjust orphan siblings (no hier edges) to their generation's anchored Y
+        let orphanAdjusted = 0;
+        for (const [id, pos] of Object.entries(layoutPositions)) {
+          if (String(id).startsWith('m-')) continue; // skip helpers
+          const deg = hierDegree.get(String(id)) || 0;
+          if (deg > 0) continue; // already anchored by hierarchy
+          const memGen2 = Number(memById.get(String(id))?.generation);
+          const gen = Number.isFinite(memGen2) ? memGen2 : (genMap.has(String(id)) ? genMap.get(String(id)) : NaN);
+          const y = anchoredY.has(gen) ? anchoredY.get(gen) : nearestAnchored(gen);
+          if (Number.isFinite(y)) {
+            layoutPositions[String(id)] = { ...pos, y };
+            orphanAdjusted += 1;
+          }
+        }
+        if (import.meta?.env?.MODE !== 'production' && orphanAdjusted > 0) {
+          try { console.info('[AutoLayout] sibling-only nodes adjusted to generation rows:', orphanAdjusted); } catch {}
+        }
+        
+        // 2) Level spouses to same horizontal Y, favoring the anchored partner
+        try {
+          for (const ed of (edges || [])) {
+            if (String(ed?.data?.type || '').toLowerCase() !== 'spouse') continue;
+            const a = String(ed.source || '');
+            const b = String(ed.target || '');
+            const pa = layoutPositions[a];
+            const pb = layoutPositions[b];
+            if (!pa || !pb) continue;
+            const aAnch = (hierDegree.get(a) || 0) > 0;
+            const bAnch = (hierDegree.get(b) || 0) > 0;
+            if (aAnch && !bAnch) {
+              layoutPositions[b] = { ...pb, y: pa.y };
+            } else if (!aAnch && bAnch) {
+              layoutPositions[a] = { ...pa, y: pb.y };
+            } else if (!aAnch && !bAnch) {
+              // Neither anchored: try generation anchor, else equalize to average
+              const ga = Number(memById.get(a)?.generation);
+              const gb = Number(memById.get(b)?.generation);
+              const ya = anchoredY.has(ga) ? anchoredY.get(ga) : nearestAnchored(ga);
+              const yb = anchoredY.has(gb) ? anchoredY.get(gb) : nearestAnchored(gb);
+              const y = Number.isFinite(ya) ? ya : (Number.isFinite(yb) ? yb : ((pa.y + pb.y) / 2));
+              if (Number.isFinite(y)) {
+                layoutPositions[a] = { ...pa, y };
+                layoutPositions[b] = { ...pb, y };
+              }
+            }
+          }
+        } catch {}
+
+  // 3) Level sibling components to a common Y (consistent row), using anchored members or generation
+        try {
+          // Build sibling adjacency
+          const adj = new Map();
+          for (const ed of (edges || [])) {
+            if (String(ed?.data?.type || '').toLowerCase() !== 'sibling') continue;
+            const u = String(ed.source || '');
+            const v = String(ed.target || '');
+            if (!layoutPositions[u] || !layoutPositions[v]) continue;
+            if (!adj.has(u)) adj.set(u, new Set());
+            if (!adj.has(v)) adj.set(v, new Set());
+            adj.get(u).add(v); adj.get(v).add(u);
+          }
+          const visited = new Set();
+          for (const start of adj.keys()) {
+            if (visited.has(start)) continue;
+            // Collect component
+            const comp = [];
+            const stack = [start];
+            visited.add(start);
+            while (stack.length) {
+              const u = stack.pop();
+              comp.push(u);
+              for (const w of (adj.get(u) || [])) {
+                if (visited.has(w)) continue;
+                visited.add(w);
+                stack.push(w);
+              }
+            }
+            if (comp.length <= 1) continue;
+            // Determine anchor Y for this component
+            const anchoredYs = comp
+              .filter(id => (hierDegree.get(id) || 0) > 0)
+              .map(id => layoutPositions[id]?.y)
+              .filter(y => Number.isFinite(y));
+            let yComp;
+            if (anchoredYs.length) {
+              const sorted = anchoredYs.slice().sort((a, b) => a - b);
+              yComp = sorted[Math.floor(sorted.length / 2)];
+            } else {
+              // fallback to generation anchor of most members
+              const genCounts = new Map();
+              for (const id of comp) {
+                const mg = Number(memById.get(id)?.generation);
+                const g = Number.isFinite(mg) ? mg : (genMap.has(id) ? genMap.get(id) : NaN);
+                if (!Number.isFinite(g)) continue;
+                genCounts.set(g, (genCounts.get(g) || 0) + 1);
+              }
+              const gens = Array.from(genCounts.entries()).sort((a, b) => b[1] - a[1]);
+              if (gens.length) {
+                const g = gens[0][0];
+                yComp = anchoredY.has(g) ? anchoredY.get(g) : nearestAnchored(g);
+              }
+            }
+            if (!Number.isFinite(yComp)) continue;
+            // Apply to unanchored nodes in component
+            for (const id of comp) {
+              if ((hierDegree.get(id) || 0) > 0) continue;
+              const pos = layoutPositions[id];
+              if (!pos) continue;
+              layoutPositions[id] = { ...pos, y: yComp };
+            }
+          }
+        } catch {}
+
+        // 4) Horizontal spacing for siblings and children (prevent stacking/overlap)
+        function enforceMinGap(ids, minGap = 64, anchorX) {
+          const items = ids
+            .map(id => ({ id, x: layoutPositions[id]?.x ?? 0, w:  (Number.isFinite(rfNodeMap.get(id)?.width) ? rfNodeMap.get(id).width : 160) }))
+            .filter(it => layoutPositions[it.id]);
+          if (items.length <= 1) return;
+          items.sort((a, b) => a.x - b.x);
+          // Make a first pass spacing to ensure min gaps
+          let cursorRight = items[0].x + items[0].w;
+          for (let i = 1; i < items.length; i++) {
+            const it = items[i];
+            const desiredLeft = Math.max(it.x, cursorRight + minGap);
+            const dx = desiredLeft - it.x;
+            if (dx !== 0) {
+              const p = layoutPositions[it.id];
+              layoutPositions[it.id] = { ...p, x: p.x + dx };
+            }
+            cursorRight = (layoutPositions[it.id].x) + it.w;
+          }
+          if (Number.isFinite(anchorX)) {
+            const left = Math.min(...items.map(it => layoutPositions[it.id].x));
+            const right = Math.max(...items.map(it => layoutPositions[it.id].x + it.w));
+            const center = (left + right) / 2;
+            const shift = anchorX - center;
+            if (shift && Number.isFinite(shift)) {
+              for (const it of items) {
+                const p = layoutPositions[it.id];
+                layoutPositions[it.id] = { ...p, x: p.x + shift };
+              }
+            }
+          }
+        }
+
+        // 4a) Space sibling components
+        try {
+          const adj2 = new Map();
+          for (const ed of (edges || [])) {
+            if (String(ed?.data?.type || '').toLowerCase() !== 'sibling') continue;
+            const u = String(ed.source || '');
+            const v = String(ed.target || '');
+            if (!layoutPositions[u] || !layoutPositions[v]) continue;
+            if (!adj2.has(u)) adj2.set(u, new Set());
+            if (!adj2.has(v)) adj2.set(v, new Set());
+            adj2.get(u).add(v); adj2.get(v).add(u);
+          }
+          const vis2 = new Set();
+          for (const s of adj2.keys()) {
+            if (vis2.has(s)) continue;
+            const comp = [];
+            const st = [s]; vis2.add(s);
+            while (st.length) {
+              const u = st.pop();
+              comp.push(u);
+              for (const w of (adj2.get(u) || [])) {
+                if (vis2.has(w)) continue;
+                vis2.add(w); st.push(w);
+              }
+            }
+            if (comp.length > 1) enforceMinGap(comp, 72);
+          }
+        } catch {}
+
+        // 4b) Space children under each marriage point and center around marriage
+        try {
+          const byMarriage2 = new Map();
+          for (const ed of (edges || [])) {
+            if (String(ed?.data?.type || '').toLowerCase() !== 'child') continue;
+            const src = String(ed.source || '');
+            const tgt = String(ed.target || '');
+            if (!src.startsWith('m-')) continue;
+            if (!layoutPositions[src] || !layoutPositions[tgt]) continue;
+            if (!byMarriage2.has(src)) byMarriage2.set(src, new Set());
+            byMarriage2.get(src).add(tgt);
+          }
+          for (const [m, set] of byMarriage2.entries()) {
+            const kids = Array.from(set);
+            if (kids.length <= 1) continue;
+            const anchorX = layoutPositions[m]?.x;
+            enforceMinGap(kids, 64, anchorX);
+          }
+        } catch {}
+      } catch {}
+
+      // Apply positions to current nodes
+      setNodes(prev => prev.map(n => {
+        const p = layoutPositions[String(n.id)];
+        return p ? { ...n, position: { x: p.x, y: p.y } } : n;
+      }));
+
+      // After applying layout, adjust edge handles based on new positions
+      try {
+        setEdges(prev => {
+          const updated = prev.map(e => {
+            const t = String(e?.data?.type || '').toLowerCase();
+            const sp = layoutPositions[String(e.source)];
+            const tp = layoutPositions[String(e.target)];
+            if (!sp || !tp) return e;
+            if (t === 'spouse' || t === 'sibling') {
+              const dx = (tp.x || 0) - (sp.x || 0);
+              const srcRight = dx >= 0;
+              const sourceHandle = `${srcRight ? 'right' : 'left'}-source`;
+              const targetHandle = `${srcRight ? 'left' : 'right'}-target`;
+              if (e.sourceHandle === sourceHandle && e.targetHandle === targetHandle) return e;
+              return { ...e, sourceHandle, targetHandle };
+            }
+            if (t === 'child') {
+              const sourceHandle = 'bottom-source';
+              const targetHandle = 'top-target';
+              if (e.sourceHandle === sourceHandle && e.targetHandle === targetHandle) return e;
+              return { ...e, sourceHandle, targetHandle };
+            }
+            return e;
+          });
+          return updated;
+        });
+      } catch (e) { /* ignore handle adjust errors */ }
+
+      // Optionally fit view after layout
+  try { rfApiRef.current?.fitView?.({ padding: 0.1 }); } catch (e) {}
+
+      setLayoutActive(true);
+      setLayoutBusy(false);
+      showToast('Auto layout applied');
+    } catch (err) {
+      setLayoutBusy(false);
+      showToast(`Layout failed: ${err?.message || err}`);
+    }
+  }
+
   // CANVAS WORKFLOW: Add a basic visual node (not creating a member in DB)
   async function handleAddPersonAt(position) {
     if (!treeId) return alert('Create a tree first.');
@@ -693,7 +1286,8 @@ function App() {
           const already = (parentMember?.relationships || []).some(r => String((r.relative && r.relative._id) || r.relative) === String(tgt) && r.type === 'child');
           if (already) continue;
 
-          ops.push(Relationships.create({ fromMemberId: parentId, toMemberId: tgt, type: 'child', label: 'child' }));
+          // mark as authored so layout/visualization preserves the direction as entered by the user
+          ops.push(Relationships.create({ fromMemberId: parentId, toMemberId: tgt, type: 'child', label: 'child', authored: true }));
         }
 
         if (!ops.length) {
@@ -723,7 +1317,8 @@ function App() {
       console.log(`[confirmRelationship] Creating: ${relPicker.source} -> ${relPicker.target}, type=${type}, label=${label}`);
       // Remove any preview once we commit (we'll show the real edge after reload)
       // Keeping the preview until after loadTree would avoid any single-frame overlap, but both are acceptable.
-      await Relationships.create({ fromMemberId: relPicker.source, toMemberId: relPicker.target, type, label });
+  // Mark user-created relationship as authored so the visual direction remains as the user specified
+  await Relationships.create({ fromMemberId: relPicker.source, toMemberId: relPicker.target, type, label, authored: true });
       setRelPicker({ open: false, source: '', target: '', sourceHandle: '', targetHandle: '' });
       await loadTree(treeId);
       setPreviewEdge(null);
@@ -1308,6 +1903,9 @@ function App() {
           onDropMember={isAuthed && canEdit ? handleDropMember : undefined}
           exportRef={exportRef}
           onRfReady={(inst) => { rfApiRef.current = inst; }}
+          onAutoLayout={handleAutoLayout}
+          layoutActive={layoutActive}
+          layoutBusy={layoutBusy}
         />
         {relPicker.open && (
           <RelationshipPicker

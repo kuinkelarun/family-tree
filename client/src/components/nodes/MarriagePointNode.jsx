@@ -64,7 +64,7 @@ export default function MarriagePointNode({ data, selected }) {
           {'⚭'}
         </span>
       </div>
-      {hovering && (
+      {hovering && false && (
         <div
           style={{
             position: 'absolute',

@@ -78,20 +78,31 @@ export default function FamilyEdge({
   // Determine whether to show the hover tooltip: suppress for parent edge from parent to marriage point (not allowed)
   const showHoverHint = useMemo(() => {
     if (virtual) return false;
-    if (type === 'parent' && !fromMarriagePoint) {
-      // parent -> marriage point edges (our code draws these as parent with fromMarriagePoint=false)
-      return false;
-    }
+    // suppress for parent connectors from parent node to marriage point
+    if (type === 'parent-connector') return false;
+    // optionally also suppress any parent edge that is NOT from a marriage point (direct parent link)
+    if (type === 'parent' && !fromMarriagePoint) return false;
     return true;
   }, [virtual, type, fromMarriagePoint]);
 
   return (
-    <g onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
+    <g>
       <BaseEdge 
         id={id}
         path={edgePath} 
         markerEnd={markerEndStyle} 
         style={edgeStyle} 
+        interactionWidth={16}
+      />
+      {/* Transparent hit path on top to reliably capture hover/mouse events across browsers */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={16}
+        style={{ pointerEvents: 'all' }}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
       />
       {effectiveLabel && !virtual && (
         <EdgeLabel 

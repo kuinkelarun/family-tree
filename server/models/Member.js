@@ -9,6 +9,9 @@ const RelationshipSchema = new mongoose.Schema(
       required: true,
     },
     label: { type: String }, // custom label when type = custom
+    // Authored indicates the direction was explicitly created by the user (source -> target).
+    // This helps the client prefer the authored side when both reciprocal entries exist.
+    authored: { type: Boolean, default: false },
   },
   { _id: false }
 );
