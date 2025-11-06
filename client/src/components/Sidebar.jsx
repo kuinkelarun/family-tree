@@ -44,7 +44,7 @@ export default function Sidebar({
   <hr style={{ margin: '12px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
       
       {/* Member Pool - NOT on canvas */}
-  <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+  <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div>
           <strong style={{ fontSize: 14, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }}></span>
@@ -70,7 +70,9 @@ export default function Sidebar({
               No members in pool. Use the "+ Add New Member" button above to create members.
             </div>
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0 0', display: 'grid', gap: 6 }}>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0 0', display: 'grid', gap: 6,
+              ...(membersNotOnCanvas.length > 5 ? { maxHeight: 5 * 46, overflowY: 'auto', paddingRight: 4 } : {})
+            }}>
               {membersNotOnCanvas.map((m) => (
                 <li
                   key={m._id}
@@ -136,7 +138,16 @@ export default function Sidebar({
               No members on canvas yet.
             </div>
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0 0', display: 'grid', gap: 4 }}>
+            <ul style={{
+              listStyle: 'none',
+              padding: 0,
+              margin: '8px 0 0 0',
+              display: 'grid',
+              gap: 4,
+              height: 9 * 38, // fixed viewport for 10 items
+              overflowY: 'auto',
+              paddingRight: 4
+            }}>
               {membersOnCanvas.map((m) => (
                 <li
                   key={m._id}
