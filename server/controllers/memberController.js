@@ -1,6 +1,8 @@
+import mongoose from 'mongoose';
 import Member from '../models/Member.js';
 import FamilyTree from '../models/FamilyTree.js';
 import { memberCreateSchema, memberUpdateSchema } from '../utils/validate.js';
+import { normalizeMemberRelationships } from '../utils/normalizeRelationships.js';
 
 export async function createMember(req, res) {
   try {
@@ -11,11 +13,19 @@ export async function createMember(req, res) {
     if (!tree) return res.status(404).json({ error: 'Tree not found' });
     if (!(tree.owner.equals(req.user.id) || tree.permissions.some((p) => p.user.equals(req.user.id) && p.access !== 'viewer')))
       return res.status(403).json({ error: 'Forbidden' });
-  const member = await Member.create(data);
-  if (!Array.isArray(tree.members)) tree.members = [];
-  tree.members.push(member._id);
-    await tree.save();
-    res.status(201).json(member);
+    const session = await mongoose.startSession();
+    let created;
+    await session.withTransaction(async () => {
+      const member = await Member.create([data], { session });
+      created = member[0];
+      if (!Array.isArray(tree.members)) tree.members = [];
+      tree.members.push(created._id);
+      await tree.save({ session });
+      // Ensure inverse parent/child edges
+      await normalizeMemberRelationships(session, created);
+    });
+    await session.endSession();
+    res.status(201).json(created);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -62,8 +72,14 @@ export async function updateMember(req, res) {
       }
     }
     Object.assign(member, otherData);
-    
-    await member.save();
+
+    // Save and normalize inside a transaction
+    const session = await mongoose.startSession();
+    await session.withTransaction(async () => {
+      await member.save({ session });
+      await normalizeMemberRelationships(session, member);
+    });
+    await session.endSession();
     console.log('[updateMember] Member AFTER save:', { name: member.name, position: member.position });
     
     // Verify it's actually in the database

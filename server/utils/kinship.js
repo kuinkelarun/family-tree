@@ -6,7 +6,7 @@
  * @param {Array} members - array of member docs (lean objects) with relationships
  * @returns {{ parentsOf: Map<string, Set<string>>, childrenOf: Map<string, Set<string>>, spousesOf: Map<string, Set<string>> }}
  */
-export function buildAdjacency(members) {
+export function buildAdjacency(members, options = {}) {
   const parentsOf = new Map();
   const childrenOf = new Map();
   const spousesOf = new Map();
@@ -19,6 +19,7 @@ export function buildAdjacency(members) {
     map.get(ks).add(vs);
   };
 
+  const parentLikeLabels = (options.parentLikeLabels || ['guardian','adoptive-parent','adoptive parent']).map(s=>s.toLowerCase());
   for (const m of members || []) {
     const mid = String(m._id);
     for (const r of m.relationships || []) {
@@ -33,6 +34,10 @@ export function buildAdjacency(members) {
       } else if (r.type === 'spouse' || r.type === 'partner' || (r.type === 'custom' && typeof r.label === 'string' && ['partner','spouse'].includes(r.label.toLowerCase()))) {
         add(spousesOf, mid, rid);  // symmetric spouse relation
         add(spousesOf, rid, mid);
+      } else if (r.type === 'custom' && typeof r.label === 'string' && parentLikeLabels.includes(r.label.toLowerCase())) {
+        // Treat configured custom labels as parent links
+        add(parentsOf, mid, rid);
+        add(childrenOf, rid, mid);
       } else if (r.type === 'sibling') {
         // Track explicit sibling edges (may exist even without parent data)
         if (!siblingsOf.has(mid)) siblingsOf.set(mid, new Set());
@@ -48,17 +53,19 @@ export function buildAdjacency(members) {
     if (!siblingsOf.has(mid)) siblingsOf.set(mid, new Set());
   }
 
-  // Inference pass: propagate known parents across explicit sibling edges.
-  // If X is an explicit sibling of Y and Y has a parent P, infer P as a parent of X (and X as a child of P).
-  // This helps when sibling links exist but parent links are missing for one sibling (common in partial data entry).
-  for (const [x, sibs] of siblingsOf.entries()) {
-    const xParents = parentsOf.get(x) || new Set();
-    for (const y of sibs) {
-      const yParents = parentsOf.get(y) || new Set();
-      for (const p of yParents) {
-        if (!xParents.has(p)) {
-          add(parentsOf, x, p);
-          add(childrenOf, p, x);
+  if (options.inferParentsFromSiblings !== false) {
+    // Inference pass: propagate known parents across explicit sibling edges.
+    // If X is an explicit sibling of Y and Y has a parent P, infer P as a parent of X (and X as a child of P).
+    // This helps when sibling links exist but parent links are missing for one sibling (common in partial data entry).
+    for (const [x, sibs] of siblingsOf.entries()) {
+      const xParents = parentsOf.get(x) || new Set();
+      for (const y of sibs) {
+        const yParents = parentsOf.get(y) || new Set();
+        for (const p of yParents) {
+          if (!xParents.has(p)) {
+            add(parentsOf, x, p);
+            add(childrenOf, p, x);
+          }
         }
       }
     }
@@ -251,18 +258,23 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
 }
 
 export function kinshipBetween(A, B, members, options = {}) {
-  const graphs = buildAdjacency(members);
+  const graphs = buildAdjacency(members, options);
   // Base consanguine/spouse/sibling detection
   const base = classifyConsanguine(A, B, graphs, options);
   // If we already have a specific non-none label (including spouse), return it
   if (base && base.class !== 'none' && base.label && !/^related \(undetermined/.test(base.label)) {
-    return { ...base, meta: { ...(base.meta || {}), affinal: !!(base.class === 'affinal'), step: false } };
+    const explain = buildExplanation(A, B, graphs, base, options);
+    return { ...base, meta: { ...(base.meta || {}), affinal: !!(base.class === 'affinal'), step: false }, explain };
   }
   // Try step- and in-law overlays
   const over = overlayAffinalStep(A, B, graphs, options);
-  if (over) return over;
+  if (over) {
+    const explain = buildExplanation(A, B, graphs, over, options);
+    return { ...over, explain };
+  }
   // Fallback to base (unrelated or undetermined)
-  return { ...base, meta: { ...(base.meta || {}), affinal: false, step: false } };
+  const explain = buildExplanation(A, B, graphs, base, options);
+  return { ...base, meta: { ...(base.meta || {}), affinal: false, step: false }, explain };
 }
 
 // -------- helpers --------
@@ -376,4 +388,60 @@ function affinalize(res) {
   // parent/grandparent/...-in-law, sibling-in-law, cousin-in-law, aunt/uncle-in-law, niece/nephew-in-law
   const label = `${base} in-law`;
   return { label, class: 'affinal', meta: { ...(res.meta || {}), affinal: true, step: false } };
+}
+
+// ------- explanation path builder -------
+function buildExplanation(A, B, graphs, classification, options = {}) {
+  const { parentsOf } = graphs;
+  const a = String(A), b = String(B);
+  const out = [];
+  if (!classification || !classification.label) return out;
+  // Lineal ancestor/descendant
+  if (classification.class === 'lineal') {
+    if (classification.meta?.role === 'ancestor') {
+      // A ancestor of B: path up from B to A
+      const path = ascendChain(b, a, parentsOf, options.depthLimit || 10);
+      path.forEach((id, idx) => out.push({ via: 'ancestor', member: id, depth: idx + 1 }));
+    } else if (classification.meta?.role === 'descendant') {
+      // A descendant of B: path up from A to B
+      const path = ascendChain(a, b, parentsOf, options.depthLimit || 10);
+      path.forEach((id, idx) => out.push({ via: 'ancestor', member: id, depth: idx + 1 }));
+    }
+  } else if (classification.meta?.mrcaId) {
+    // Cousins / collateral via MRCA
+    const mrca = classification.meta.mrcaId;
+    const pathA = ascendChain(a, mrca, parentsOf, options.depthLimit || 10);
+    const pathB = ascendChain(b, mrca, parentsOf, options.depthLimit || 10);
+    out.push({ via: 'mrca', member: mrca, depthA: pathA.length, depthB: pathB.length });
+  } else if (classification.meta?.viaAncestor) {
+    // Aunt/uncle derived via ancestor sibling inference
+    out.push({ via: 'ancestor', member: classification.meta.viaAncestor, depth: classification.meta.stepsUp });
+  } else if (classification.class === 'affinal') {
+    // Attempt to show affinal base if provided
+    if (classification.meta?.baseRelation) {
+      out.push({ via: 'affinal-base', relation: classification.meta.baseRelation });
+    }
+  }
+  return out;
+}
+
+function ascendChain(start, target, parentsOf, limit = 10) {
+  // Simple DFS bounded search for a target ancestor to build a chain
+  const s = String(start), t = String(target);
+  if (s === t) return [];
+  const stack = [[s, []]];
+  const visited = new Set([s]);
+  while (stack.length) {
+    const [cur, path] = stack.pop();
+    const depth = path.length;
+    if (depth >= limit) continue;
+    for (const p of parentsOf.get(cur) || []) {
+      if (visited.has(p)) continue;
+      const newPath = [...path, p];
+      if (p === t) return newPath; // path excludes start, includes target ancestor
+      visited.add(p);
+      stack.push([p, newPath]);
+    }
+  }
+  return [];
 }
