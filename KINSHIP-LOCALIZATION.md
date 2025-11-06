@@ -24,6 +24,31 @@ When you edit `server/data/kinship-locales.json`, restart the server to reload t
 - The localizer (`localizeKinship`) uses `relationCode` and the selected locale (e.g., `en`, `np`) to format a label.
 - “In-law” relationships are handled by an `affinal` flag in `meta`; the localizer appends a locale-specific `affinalSuffix`.
 
+### Per-level overrides (unique names for each generation)
+
+If your language has unique names for each generation beyond grandparent/grandchild, you can add explicit overrides that take precedence over the prefix logic:
+
+- Add a `levels` object inside `ancestor`, `descendant`, `aunt_uncle`, or `niece_nephew` with string keys for the level number.
+- The lookup order is: `levels[level]` → `level1/level2` → `greatPrefix.repeat(n) + root` → `greatTemplate` fallback.
+
+Example (Nepali):
+
+```json
+"ancestor": {
+  "level1": "बा/आमा",
+  "level2": "हजुरबा/हजुरआमा",
+  "levels": {
+    "3": "परहजुरबा/परहजुरआमा",
+    "4": "प्रपरहजुरबा/प्रपरहजुरआमा",
+    "5": "महाप्रपरहजुरबा/महाप्रपरहजुरआमा"
+  },
+  "greatPrefix": "पर",
+  "root": "हजुरबा/हजुरआमा"
+}
+```
+
+Do the same for `descendant` to control great-/great-great-grandchild labels explicitly.
+
 ## Mapping format
 
 Open `server/data/kinship-locales.json`. It contains a top-level object keyed by locale code (e.g., `"en"`, `"np"`). Each locale has sections:

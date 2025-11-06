@@ -42,6 +42,10 @@ export function localizeKinship(result, locale = 'en') {
 
 function formatTier(section, level) {
   if (!section) return '';
+  // Explicit per-level override takes highest precedence
+  if (section.levels && section.levels[String(level)]) {
+    return section.levels[String(level)];
+  }
   if (level === 1) return section.level1;
   if (level === 2) return section.level2;
   const n = level - 2;
