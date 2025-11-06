@@ -172,7 +172,7 @@ export default function MemberModal({
           {/* Top section: left photo panel, right details */}
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 180px) 1fr', gap: 12, alignItems: 'start' }}>
             {/* Left: Photo panel */}
-            <div style={{ display: 'grid', gap: 10, marginLeft: 0 }}>
+            <div style={{ display: 'grid', gap: 10, marginLeft: 0, position: 'relative', zIndex: 1 }}>
               <div style={{ position: 'relative', width: 112, height: 112 }}>
                 <div
                   role="button"
@@ -270,7 +270,7 @@ export default function MemberModal({
 
               {/* Photo edit panel (URL + Upload) - toggled */}
               {photoEditOpen && (
-                <div style={{ display: 'grid', gap: 8, padding: 8, background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 10 }}>
+                <div style={{ display: 'grid', gap: 8, padding: 6, background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: 10, position: 'relative', zIndex: 3, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <strong style={{ fontSize: 12, color: '#374151' }}>{photo?.trim() ? 'Change Photo' : 'Add Photo'}</strong>
                     <button
@@ -282,7 +282,7 @@ export default function MemberModal({
                     </button>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', flexWrap: 'wrap' }}>
                     <input
                       value={photo}
                       onChange={(e) => setPhoto(e.target.value)}
@@ -291,9 +291,9 @@ export default function MemberModal({
                       style={{
                         flex: 1,
                         minWidth: 160,
-                        padding: '8px 12px',
-                        height: '40px',
-                        fontSize: 13,
+                        padding: '6px 10px',
+                        height: '34px',
+                        fontSize: 12,
                         border: '2px solid #e5e7eb',
                         borderRadius: 8,
                         outline: 'none',
@@ -348,8 +348,8 @@ export default function MemberModal({
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       style={{
-                        padding: '7px 10px',
-                        fontSize: 13,
+                        padding: '5px 8px',
+                        fontSize: 12,
                         border: '2px solid #e5e7eb',
                         borderRadius: 6,
                         background: '#f3f4f6',
@@ -357,19 +357,19 @@ export default function MemberModal({
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         whiteSpace: 'nowrap',
-                        height: '40px'
+                        height: '34px'
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e7eb'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
                       title="Upload a photo from your device"
                     >
-                      Upload Photo
+                      Choose File to Upload
                     </button>
 
-                    {uploading && <span style={{ alignSelf: 'center', fontSize: 12, color: '#1f6feb' }}>Uploading…</span>}
-                    {uploadError && <span style={{ alignSelf: 'center', fontSize: 12, color: '#dc2626' }}>{uploadError}</span>}
+                    {uploading && <span style={{ alignSelf: 'center', fontSize: 11, color: '#1f6feb' }}>Uploading…</span>}
+                    {uploadError && <span style={{ alignSelf: 'center', fontSize: 11, color: '#dc2626' }}>{uploadError}</span>}
                   </div>
-                  <span style={{ fontSize: 11, color: '#6b7280' }}>Tip: paste a https:// URL or use Upload Photo to create a /uploads/... path.</span>
+                  <span style={{ fontSize: 10, color: '#6b7280' }}>Tip: paste a https:// URL or use Choose File to Upload to create a /uploads/... path.</span>
                 </div>
               )}
 
