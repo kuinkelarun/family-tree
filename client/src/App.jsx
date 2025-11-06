@@ -1862,11 +1862,11 @@ function App() {
       <main style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0 }}>Family Tree Builder</h1>
-          {/* Header is kept minimal; debug/info moved to the footer details */}
+          {/* Right-aligned action bar (restored). Only change: email is positioned above the Logout button */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             {isAuthed ? (
               <>
-                <span style={{ color: '#1f2937', fontSize: 12 }}>{currentUser?.email}</span>
+                {/* Keep original order of controls */}
                 <button onClick={handleCreateTree} style={{ padding: '6px 10px', borderRadius: 6, background: '#16a34a', color: '#fff', border: 'none' }}>Create Tree</button>
                 <select value={treeId || ''} onChange={(e) => { const id = e.target.value; handleSelectTree(id); }} style={{ padding: 6 }}>
                   <option value="">Select a tree…</option>
@@ -1880,7 +1880,11 @@ function App() {
                 <button title="Refresh list" onClick={loadMyTrees} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1' }}>↻</button>
                 <button onClick={() => setShowKinship(true)} disabled={!treeId || !members.length} style={{ padding: '6px 10px', borderRadius: 6, background: (treeId && members.length) ? '#6b7280' : '#94a3b8', color: '#fff', border: 'none' }}>Kinship</button>
                 <button onClick={handleExportPng} disabled={!nodes.length} style={{ padding: '6px 10px', borderRadius: 6, background: nodes.length ? '#0ea5e9' : '#94a3b8', color: '#fff', border: 'none' }}>Export PNG</button>
-                <button onClick={handleLogout} style={{ padding: '6px 10px', borderRadius: 6, background: '#ef4444', color: '#fff', border: 'none' }}>Logout</button>
+                {/* Logout group with email above, aligned right */}
+                <div style={{ position: 'relative', display: 'inline-flex' }}>
+                  <span style={{ position: 'absolute', right: 0, bottom: '100%', marginBottom: 2, color: '#1f2937', fontSize: 12 }}>{currentUser?.email}</span>
+                  <button onClick={handleLogout} style={{ padding: '6px 10px', borderRadius: 6, background: '#ef4444', color: '#fff', border: 'none' }}>Logout</button>
+                </div>
               </>
             ) : (
               <>
