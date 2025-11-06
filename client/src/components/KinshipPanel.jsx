@@ -12,6 +12,10 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
   const [error, setError] = useState('');
   const [locale, setLocale] = useState(() => localStorage.getItem('ft_locale') || 'en');
   useEffect(() => { localStorage.setItem('ft_locale', locale); }, [locale]);
+  const [useGendered, setUseGendered] = useState(() => (localStorage.getItem('ft_useGendered') || '1') === '1');
+  const [includePronouns, setIncludePronouns] = useState(() => (localStorage.getItem('ft_includePronouns') || '0') === '1');
+  useEffect(() => { localStorage.setItem('ft_useGendered', useGendered ? '1' : '0'); }, [useGendered]);
+  useEffect(() => { localStorage.setItem('ft_includePronouns', includePronouns ? '1' : '0'); }, [includePronouns]);
 
   // Re-run the query when locale changes and we already have results
   useEffect(() => {
@@ -36,8 +40,8 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
       setResultAB(null);
       setResultBA(null);
       const [resAB, resBA] = await Promise.all([
-        Trees.kinship(treeId, a, b, depth, locale),
-        Trees.kinship(treeId, b, a, depth, locale),
+        Trees.kinship(treeId, a, b, depth, locale, includePronouns),
+        Trees.kinship(treeId, b, a, depth, locale, includePronouns),
       ]);
       setResultAB(resAB);
       setResultBA(resBA);
@@ -55,7 +59,7 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
           <h3 style={{ margin: 0, flex: 1 }}>Kinship Explorer</h3>
           <button onClick={onClose} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1' }}>Close</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto auto', gap: 8, marginTop: 12 }}>
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto auto auto auto', gap: 8, marginTop: 12 }}>
           <select value={a} onChange={(e) => setA(e.target.value)} style={{ padding: 6 }}>
             <option value="">Member A…</option>
             {sortedMembers.map(m => (
@@ -73,6 +77,12 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
             <option value="en">English</option>
             <option value="np">Nepali</option>
           </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <input type="checkbox" checked={useGendered} onChange={(e) => setUseGendered(e.target.checked)} /> Gendered labels
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <input type="checkbox" checked={includePronouns} onChange={(e) => setIncludePronouns(e.target.checked)} /> Pronouns
+          </label>
           <button disabled={!canQuery || !a || !b || loading} onClick={runQuery} style={{ padding: '6px 10px', borderRadius: 6, background: (!canQuery || !a || !b) ? '#94a3b8' : '#1f6feb', color: '#fff', border: 'none' }}>Check</button>
         </div>
         {error && <div style={{ marginTop: 10, color: '#b91c1c' }}>{error}</div>}
@@ -84,12 +94,21 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
                 <div style={{ marginBottom: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span>
                     <strong>{displayMemberName(members.find(m => String(m._id) === String(a)) || {}) || 'A'}</strong> is{' '}
-                    <strong>{locale === 'en' ? resultAB.label : (resultAB.localizedLabel || resultAB.label)}</strong>{' '}of{' '}
+                    <strong>{(() => {
+                      const chosen = useGendered ? (resultAB.genderedLabel || resultAB.localizedLabel || resultAB.label)
+                                                 : (resultAB.neutralLabel || resultAB.localizedLabel || resultAB.label);
+                      return locale === 'en' ? chosen : (resultAB.localizedLabel || chosen);
+                    })()}</strong>{' '}of{' '}
                     <strong>{displayMemberName(members.find(m => String(m._id) === String(b)) || {}) || 'B'}</strong>
                   </span>
                   {locale !== 'en' && resultAB.localizedLabel && (
                     <span style={{ fontSize: 12, color: '#475569' }}>
                       (EN: {resultAB.label})
+                    </span>
+                  )}
+                  {includePronouns && resultAB.pronounsA && (
+                    <span style={{ fontSize: 12, color: '#475569' }}>
+                      Pronouns A: {resultAB.pronounsA.subject}/{resultAB.pronounsA.object}/{resultAB.pronounsA.possessive}
                     </span>
                   )}
                 </div>
@@ -101,12 +120,21 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
                 <div style={{ marginBottom: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span>
                     <strong>{displayMemberName(members.find(m => String(m._id) === String(b)) || {}) || 'B'}</strong> is{' '}
-                    <strong>{locale === 'en' ? resultBA.label : (resultBA.localizedLabel || resultBA.label)}</strong>{' '}of{' '}
+                    <strong>{(() => {
+                      const chosen = useGendered ? (resultBA.genderedLabel || resultBA.localizedLabel || resultBA.label)
+                                                 : (resultBA.neutralLabel || resultBA.localizedLabel || resultBA.label);
+                      return locale === 'en' ? chosen : (resultBA.localizedLabel || chosen);
+                    })()}</strong>{' '}of{' '}
                     <strong>{displayMemberName(members.find(m => String(m._id) === String(a)) || {}) || 'A'}</strong>
                   </span>
                   {locale !== 'en' && resultBA.localizedLabel && (
                     <span style={{ fontSize: 12, color: '#475569' }}>
                       (EN: {resultBA.label})
+                    </span>
+                  )}
+                  {includePronouns && resultBA.pronounsA && (
+                    <span style={{ fontSize: 12, color: '#475569' }}>
+                      Pronouns A: {resultBA.pronounsA.subject}/{resultBA.pronounsA.object}/{resultBA.pronounsA.possessive}
                     </span>
                   )}
                 </div>

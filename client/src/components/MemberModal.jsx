@@ -18,6 +18,7 @@ export default function MemberModal({
   const [photo, setPhoto] = useState('');
   const [notes, setNotes] = useState('');
   const [location, setLocation] = useState('');
+  const [gender, setGender] = useState('unknown');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -57,6 +58,7 @@ export default function MemberModal({
       setPhoto(member?.photo || '');
       setNotes(member?.notes || '');
       setLocation(member?.location || '');
+      setGender(member?.gender || 'unknown');
       setLightboxOpen(false);
       setPhotoEditOpen(false);
       setUploadError('');
@@ -71,6 +73,7 @@ export default function MemberModal({
     if (photo && String(photo).trim()) payload.photo = String(photo).trim();
     if (notes && String(notes).trim()) payload.notes = notes;
     if (location && String(location).trim()) payload.location = location;
+  if (gender) payload.gender = gender;
 
     // Debug: log the payload being submitted (helps track 400 validation issues)
     // eslint-disable-next-line no-console
@@ -107,7 +110,10 @@ export default function MemberModal({
           background: '#ffffff', 
           borderRadius: 14, 
           boxShadow: '0 16px 44px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.05)', 
-          overflow: 'hidden',
+          // Allow vertical scroll inside the dialog if content exceeds viewport height
+          maxHeight: '92vh',
+          overflowY: 'auto',
+          overflowX: 'hidden',
           animation: 'slideUp 0.25s ease-out'
         }}
       >
@@ -162,11 +168,11 @@ export default function MemberModal({
         </div>
 
         {/* Form */}
-  <form onSubmit={handleSubmit} style={{ padding: '18px', display: 'grid', gap: 14, background: '#f9fafb' }}>
+  <form onSubmit={handleSubmit} style={{ padding: '16px', paddingBottom: '12px', display: 'grid', gap: 12, background: '#f9fafb' }}>
           {/* Top section: left photo panel, right details */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 220px) 1fr', gap: 14, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 180px) 1fr', gap: 12, alignItems: 'start' }}>
             {/* Left: Photo panel */}
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gap: 10, marginLeft: 0 }}>
               <div style={{ position: 'relative', width: 112, height: 112 }}>
                 <div
                   role="button"
@@ -428,7 +434,7 @@ export default function MemberModal({
             </div>
 
             {/* Right: Details panel */}
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gap: 10, marginLeft: -6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
               <label style={{ display: 'grid', gap: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', letterSpacing: '0.3px' }}>
@@ -494,6 +500,51 @@ export default function MemberModal({
                   This name and nickname are already used. Please choose a different nickname.
                 </div>
               )}
+
+              {/* Gender radio group inserted below Name/Nickname and above Date of Birth/Location */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '96px 1fr',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 0,
+                marginBottom: 0
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', letterSpacing: '0.3px', lineHeight: '32px', marginLeft: -12 }}>Gender</span>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#1f2937', whiteSpace: 'nowrap' }}>
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="male"
+                      checked={gender === 'male'}
+                      onChange={(e) => setGender(e.target.value)}
+                    />
+                    Male
+                  </label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#1f2937', whiteSpace: 'nowrap' }}>
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="female"
+                      checked={gender === 'female'}
+                      onChange={(e) => setGender(e.target.value)}
+                    />
+                    Female
+                  </label>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#1f2937', whiteSpace: 'nowrap' }}>
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="nonbinary"
+                      checked={gender === 'nonbinary'}
+                      onChange={(e) => setGender(e.target.value)}
+                    />
+                    Non‑binary
+                  </label>
+                  {/* No hint needed for unknown */}
+                </div>
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <label style={{ display: 'grid', gap: 6 }}>
@@ -582,6 +633,7 @@ export default function MemberModal({
                   />
                 </label>
               </div>
+              {/* Removed old select-based gender selector */}
             </div>
           </div>
 
@@ -615,12 +667,17 @@ export default function MemberModal({
 
           {/* Action Buttons */}
           <div style={{ 
+            position: 'sticky',
+            bottom: 0,
+            background: 'linear-gradient(to top, rgba(249,250,251,0.98), rgba(249,250,251,0.92), rgba(249,250,251,0))',
+            backdropFilter: 'blur(2px)',
             display: 'flex', 
             gap: 10, 
             flexWrap: 'wrap', 
-            marginTop: 6,
-            paddingTop: 14,
-            borderTop: '1px solid #e5e7eb'
+            marginTop: 4,
+            paddingTop: 8,
+            paddingBottom: 8,
+            borderTop: '1px solid rgba(17,24,39,0.06)'
           }}>
             <button 
               type="submit" 

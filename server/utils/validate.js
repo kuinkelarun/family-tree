@@ -24,6 +24,10 @@ export const memberCreateSchema = z.object({
   name: z.string().min(1),
   nickname: z.string().optional(),
   dob: z.string().optional(),
+  // Semantic gender used for localization/pronouns. Defaults to 'unknown' if omitted.
+  gender: z.enum(['male','female','nonbinary','unknown']).optional(),
+  // Optional custom pronouns pattern: subject|object|possessive (e.g. he|him|his)
+  pronounOverride: z.string().regex(/^[^|]+\|[^|]+\|[^|]+$/).optional(),
   // Support either a full URL (https://...) or a relative upload path (/uploads/filename)
   photo: z.union([
     z.string().url(),
@@ -50,6 +54,8 @@ export const memberUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   nickname: z.string().optional(),
   dob: z.string().optional(),
+  gender: z.enum(['male','female','nonbinary','unknown']).optional(),
+  pronounOverride: z.string().regex(/^[^|]+\|[^|]+\|[^|]+$/).optional(),
   // Allow clearing photo by accepting empty string or null
   // and support either full URL or relative /uploads path when provided
   photo: z.union([

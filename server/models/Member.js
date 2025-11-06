@@ -42,6 +42,29 @@ const MemberSchema = new mongoose.Schema(
   relationships: { type: [RelationshipSchema], default: [] },
   // Generation level for hierarchical layout (1 = root / oldest generation)
   generation: { type: Number, default: 1, index: true },
+    /**
+     * gender: Semantic gender used for kinship localization and pronoun inference.
+     * Allowed values:
+     *  - 'male'      : masculine
+     *  - 'female'    : feminine
+     *  - 'nonbinary' : non-binary / gender diverse (uses they/them by default in English)
+     *  - 'unknown'   : not specified yet (falls back to neutral kin terms)
+     *
+     * NOTE: We intentionally avoid storing cultural titles (e.g., 'दाइ', 'दिदी') directly here.
+     * These will be derived later via age rank logic (#20) and side inference.
+     *
+     * SEO/Documentation rationale: Storing a normalized gender field allows generating
+     * structured relationship labels (e.g., 'grandfather', 'grandmother', 'ससुरा', 'सासू')
+     * which improves semantic clarity for multilingual family tree queries and search indexing.
+     */
+    gender: { type: String, enum: ['male','female','nonbinary','unknown'], default: 'unknown', index: true },
+    /**
+     * pronounOverride: Optional custom pronoun set stored as a compact string pattern.
+     * Format (English example): "he|him|his" OR "she|her|her" OR "they|them|their".
+     * If absent, pronouns are derived from `gender` using default language rules.
+     * Future: Could store a locale map if we need per-language overrides.
+     */
+    pronounOverride: { type: String },
     notes: { type: String },
     occupation: { type: String },
     events: { type: [EventSchema], default: [] },

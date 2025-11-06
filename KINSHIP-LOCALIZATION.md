@@ -50,6 +50,52 @@ Example (Nepali):
 
 Do the same for `descendant` to control great-/great-great-grandchild labels explicitly.
 
+## Gender & Side Extensions
+
+The system now enriches `relationCode` with:
+- `gender`: gender of the relative (male | female | nonbinary | unknown)
+- `side`: maternal | paternal | ambiguous | unknown (where applicable)
+
+Localization looks for gender-specific blocks under each relation section:
+```jsonc
+"ancestor": {
+  "neutral": { "level1": "parent", "level2": "grandparent" },
+  "male":   { "level1": "father", "level2": "grandfather" },
+  "female": { "level1": "mother", "level2": "grandmother" }
+}
+```
+Fallback order: gender block → neutral block → legacy top-level keys.
+
+### Side Inference Logic (Simplified)
+- Ancestor: first hop parent along path from subject up to relative; parent gender decides side.
+- Descendant: first hop from relative up to subject.
+- Aunt/Uncle: parent(s) of subject whose sibling set includes the relative.
+- Niece/Nephew: parent(s) of relative whose sibling set includes the subject.
+- If multiple sides or unknown genders → `ambiguous`.
+
+### Pronouns
+Pronouns are derived from gender unless `pronounOverride` present (format `subject|object|possessive`):
+- male → he | him | his
+- female → she | her | her
+- nonbinary / unknown → they | them | their
+
+API: add `?includePronouns=true` to include `pronounsA` and `pronounsB`.
+
+### Example Response Fragment
+```json
+{
+  "label": "grandfather",
+  "genderedLabel": "grandfather",
+  "neutralLabel": "grandparent",
+  "localizedLabel": "हजुरबा",
+  "meta": {
+    "relationCode": { "type": "ancestor", "level": 2, "gender": "male", "side": "paternal" }
+  },
+  "pronounsA": { "subject": "he", "object": "him", "possessive": "his" }
+}
+```
+
+
 ## Mapping format
 
 Open `server/data/kinship-locales.json`. It contains a top-level object keyed by locale code (e.g., `"en"`, `"np"`). Each locale has sections:

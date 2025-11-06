@@ -51,12 +51,12 @@ export const Trees = {
   async get(id) { return api(`/api/trees/${id}`); },
   async delete(id) { return api(`/api/trees/${id}`, { method: 'DELETE' }); },
   async updateMarriagePoint(id, payload) { return api(`/api/trees/${id}/marriage-points`, { method: 'PUT', body: payload }); },
-  async kinship(id, from, to, depth = 10, locale = 'en') {
-    const q = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&depth=${encodeURIComponent(depth)}&locale=${encodeURIComponent(locale)}`;
+  async kinship(id, from, to, depth = 10, locale = 'en', includePronouns = false) {
+    const q = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&depth=${encodeURIComponent(depth)}&locale=${encodeURIComponent(locale)}&includePronouns=${includePronouns ? 'true' : 'false'}`;
     return api(`/api/trees/${id}/kinship?${q}`);
   },
-  async kinshipMap(id, memberId, depth = 8, locale = 'en') {
-    const q = `depth=${encodeURIComponent(depth)}&locale=${encodeURIComponent(locale)}`;
+  async kinshipMap(id, memberId, depth = 8, locale = 'en', includePronouns = false) {
+    const q = `depth=${encodeURIComponent(depth)}&locale=${encodeURIComponent(locale)}&includePronouns=${includePronouns ? 'true' : 'false'}`;
     return api(`/api/trees/${id}/kinship/${encodeURIComponent(memberId)}?${q}`);
   },
 };

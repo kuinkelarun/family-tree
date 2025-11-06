@@ -260,22 +260,76 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
 
 export function kinshipBetween(A, B, members, options = {}) {
   const graphs = buildAdjacency(members, options);
+  // Map member id -> gender (used to enrich relationCode for localization)
+  const genderById = new Map();
+  try {
+    for (const m of (members || [])) {
+      if (!m || !m._id) continue;
+      const g = (m.gender === 'male' || m.gender === 'female' || m.gender === 'nonbinary') ? m.gender : 'unknown';
+      genderById.set(String(m._id), g);
+    }
+  } catch {}
+
+  const ensureGender = (rel, relativeId) => {
+    // Ensure we attach the gender of the relative (A) to relationCode
+    const out = rel ? { ...rel } : { label: '', class: 'none', meta: {} };
+    out.meta = out.meta || {};
+    out.meta.relationCode = out.meta.relationCode || { type: 'related_undetermined' };
+    if (!out.meta.relationCode.gender) {
+      const g = genderById.get(String(relativeId)) || 'unknown';
+      out.meta.relationCode.gender = g;
+    }
+    return out;
+  };
+
+  const ensureSide = (rel) => {
+    const out = rel ? { ...rel } : { label: '', class: 'none', meta: {} };
+    out.meta = out.meta || {};
+    out.meta.relationCode = out.meta.relationCode || { type: 'related_undetermined' };
+    const rc = out.meta.relationCode;
+    // Only infer side for relevant relation types
+    if (!rc.side && (rc.type === 'ancestor' || rc.type === 'descendant' || rc.type === 'aunt_uncle' || rc.type === 'niece_nephew')) {
+      try {
+        const side = inferSide(String(A), String(B), out, graphs, genderById);
+        if (side) rc.side = side; // 'maternal'|'paternal'|'ambiguous'|'unknown'
+      } catch {}
+    }
+    // For affinal relations, attach spouse gender if we can deduce from throughIds
+    if (out.class === 'affinal' && !out.meta.affinalSpouseGender && Array.isArray(out.meta.affinalThroughIds)) {
+      const genders = (out.meta.affinalThroughIds || []).map(id => genderById.get(String(id)) || 'unknown');
+      const uniq = new Set(genders.filter(g => g === 'male' || g === 'female'));
+      if (uniq.size === 1) {
+        out.meta.affinalSpouseGender = [...uniq][0];
+      } else if (uniq.size > 1) {
+        out.meta.affinalSpouseGender = 'ambiguous';
+      } else {
+        out.meta.affinalSpouseGender = 'unknown';
+      }
+    }
+    return out;
+  };
   // Base consanguine/spouse/sibling detection
   const base = classifyConsanguine(A, B, graphs, options);
   // If we already have a specific non-none label (including spouse), return it
   if (base && base.class !== 'none' && base.label && !/^related \(undetermined/.test(base.label)) {
     const explain = buildExplanation(A, B, graphs, base, options);
-    return { ...base, meta: { ...(base.meta || {}), affinal: !!(base.class === 'affinal'), step: false }, explain };
+    const withGender = ensureGender({ ...base, meta: { ...(base.meta || {}), affinal: !!(base.class === 'affinal'), step: false } }, A);
+    const withSide = ensureSide(withGender);
+    return { ...withSide, explain };
   }
   // Try step- and in-law overlays
   const over = overlayAffinalStep(A, B, graphs, options);
   if (over) {
     const explain = buildExplanation(A, B, graphs, over, options);
-    return { ...over, explain };
+    const withGender = ensureGender(over, A);
+    const withSide = ensureSide(withGender);
+    return { ...withSide, explain };
   }
   // Fallback to base (unrelated or undetermined)
   const explain = buildExplanation(A, B, graphs, base, options);
-  return { ...base, meta: { ...(base.meta || {}), affinal: false, step: false }, explain };
+  const withGender = ensureGender({ ...base, meta: { ...(base.meta || {}), affinal: false, step: false } }, A);
+  const withSide = ensureSide(withGender);
+  return { ...withSide, explain };
 }
 
 // -------- helpers --------
@@ -358,14 +412,14 @@ export function overlayAffinalStep(A, B, graphs, options = {}) {
   for (const sb of (spousesOf.get(b) || [])) {
     const r = classifyConsanguine(a, sb, graphs, options);
     if (r && r.class !== 'none' && r.label && !/^related \(undetermined/.test(r.label) && r.label !== 'unrelated (by blood)') {
-      return affinalize(r);
+      return affinalize(r, { through: 'spouseOfB', throughIds: [sb] });
     }
   }
   // 2) Any spouse of A with B
   for (const sa of (spousesOf.get(a) || [])) {
     const r = classifyConsanguine(sa, b, graphs, options);
     if (r && r.class !== 'none' && r.label && !/^related \(undetermined/.test(r.label) && r.label !== 'unrelated (by blood)') {
-      return affinalize(r);
+      return affinalize(r, { through: 'spouseOfA', throughIds: [sa] });
     }
   }
   // 3) Spouse of A with spouse of B
@@ -373,7 +427,7 @@ export function overlayAffinalStep(A, B, graphs, options = {}) {
     for (const sb of (spousesOf.get(b) || [])) {
       const r = classifyConsanguine(sa, sb, graphs, options);
       if (r && r.class !== 'none' && r.label && !/^related \(undetermined/.test(r.label) && r.label !== 'unrelated (by blood)') {
-        return affinalize(r);
+        return affinalize(r, { through: 'spouseOfBoth', throughIds: [sa, sb] });
       }
     }
   }
@@ -381,14 +435,14 @@ export function overlayAffinalStep(A, B, graphs, options = {}) {
   return null;
 }
 
-function affinalize(res) {
+function affinalize(res, ctx = {}) {
   // Normalize some common labels to -in-law forms
   let base = res.label || '';
   // Map half-sibling -> sibling-in-law as common social label
   if (base === 'half-sibling') base = 'sibling';
   // parent/grandparent/...-in-law, sibling-in-law, cousin-in-law, aunt/uncle-in-law, niece/nephew-in-law
   const label = `${base} in-law`;
-  return { label, class: 'affinal', meta: { ...(res.meta || {}), affinal: true, step: false } };
+  return { label, class: 'affinal', meta: { ...(res.meta || {}), affinal: true, step: false, affinalThrough: ctx.through, affinalThroughIds: ctx.throughIds } };
 }
 
 // ------- explanation path builder -------
@@ -445,4 +499,75 @@ function ascendChain(start, target, parentsOf, limit = 10) {
     }
   }
   return [];
+}
+
+/**
+ * Infer side (maternal/paternal) for certain relations.
+ * A is the relative, B is the subject.
+ * - Ancestor: look at the first hop from B->parent on a path to A. Parent gender male→paternal, female→maternal.
+ * - Descendant: look at the first hop from A->parent on a path to B. Parent gender male→paternal (i.e., via son), female→maternal (via daughter).
+ * - Aunt/Uncle: determine which parent of B is a sibling of A.
+ * - Niece/Nephew: determine which parent of A is a sibling of B.
+ * Returns 'maternal'|'paternal'|'ambiguous'|'unknown'|undefined.
+ */
+function inferSide(A, B, classification, graphs, genderById) {
+  const { parentsOf, siblingsOf } = graphs;
+  const rc = classification?.meta?.relationCode || {};
+
+  // Helper to map a member id to gender bucket
+  const gOf = (id) => {
+    const g = genderById.get(String(id));
+    return (g === 'male' || g === 'female') ? g : 'unknown';
+  };
+
+  // Helper to convert gender to side label
+  const sideOf = (gender) => {
+    if (gender === 'male') return 'paternal';
+    if (gender === 'female') return 'maternal';
+    return 'unknown';
+  };
+
+  if (rc.type === 'ancestor') {
+    // Find a path from B up to A and inspect the first hop parent
+    const path = ascendChain(B, A, parentsOf, 10); // [firstParent, ..., A]
+    if (!path || path.length === 0) return 'unknown';
+    const firstParent = path[0];
+    return sideOf(gOf(firstParent));
+  }
+  if (rc.type === 'descendant') {
+    // Path from A up to B, inspect first hop (A's parent which is B's child)
+    const path = ascendChain(A, B, parentsOf, 10);
+    if (!path || path.length === 0) return 'unknown';
+    const firstParent = path[0];
+    return sideOf(gOf(firstParent));
+  }
+  if (rc.type === 'aunt_uncle') {
+    // Which parent of B is a sibling of A?
+    const pB = parentsOf.get(String(B)) || new Set();
+    let foundSides = new Set();
+    for (const p of pB) {
+      const sibs = siblingsOf.get(String(p)) || new Set();
+      if (sibs.has(String(A))) {
+        foundSides.add(sideOf(gOf(p)));
+      }
+    }
+    if (foundSides.size === 0) return 'unknown';
+    if (foundSides.size > 1 || foundSides.has('unknown')) return 'ambiguous';
+    return [...foundSides][0];
+  }
+  if (rc.type === 'niece_nephew') {
+    // Which parent of A is a sibling of B?
+    const pA = parentsOf.get(String(A)) || new Set();
+    let foundSides = new Set();
+    for (const p of pA) {
+      const sibs = siblingsOf.get(String(p)) || new Set();
+      if (sibs.has(String(B))) {
+        foundSides.add(sideOf(gOf(p)));
+      }
+    }
+    if (foundSides.size === 0) return 'unknown';
+    if (foundSides.size > 1 || foundSides.has('unknown')) return 'ambiguous';
+    return [...foundSides][0];
+  }
+  return undefined;
 }

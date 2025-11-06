@@ -3,12 +3,28 @@
     "affinalSuffix": " in-law",
     "self": "self",
     "spouse": "spouse",
-  "ancestor": { "level1": "parent", "level2": "grandparent", "greatPrefix": "great-", "root": "grandparent", "greatTemplate": "great-{n}-grandparent" },
-  "descendant": { "level1": "child", "level2": "grandchild", "greatPrefix": "great-", "root": "grandchild", "greatTemplate": "great-{n}-grandchild" },
+  "ancestor": { "level1": "parent", "level2": "grandparent", "greatPrefix": "great-", "root": "grandparent", "greatTemplate": "great-{n}-grandparent",
+    "neutral": { "level1": "parent", "level2": "grandparent", "greatPrefix": "great-", "root": "grandparent" },
+    "male":   { "level1": "father", "level2": "grandfather", "greatPrefix": "great-", "root": "grandfather" },
+    "female": { "level1": "mother", "level2": "grandmother", "greatPrefix": "great-", "root": "grandmother" }
+  },
+  "descendant": { "level1": "child", "level2": "grandchild", "greatPrefix": "great-", "root": "grandchild", "greatTemplate": "great-{n}-grandchild",
+    "neutral": { "level1": "child", "level2": "grandchild", "greatPrefix": "great-", "root": "grandchild" },
+    "male":   { "level1": "son", "level2": "grandson", "greatPrefix": "great-", "root": "grandson" },
+    "female": { "level1": "daughter", "level2": "granddaughter", "greatPrefix": "great-", "root": "granddaughter" }
+  },
     "sibling": { "full": "sibling", "half": "half-sibling" },
     "step": { "parent": "step-parent", "child": "step-child", "sibling": "step-sibling" },
-  "aunt_uncle": { "level1": "aunt/uncle", "level2": "grand-aunt/uncle", "greatPrefix": "great-", "root": "grand-aunt/uncle", "greatTemplate": "great-{n}-grand-aunt/uncle" },
-  "niece_nephew": { "level1": "niece/nephew", "level2": "grand-niece/nephew", "greatPrefix": "great-", "root": "grand-niece/nephew", "greatTemplate": "great-{n}-grand-niece/nephew" },
+  "aunt_uncle": { "level1": "aunt/uncle", "level2": "grand-aunt/uncle", "greatPrefix": "great-", "root": "grand-aunt/uncle", "greatTemplate": "great-{n}-grand-aunt/uncle",
+    "neutral": { "level1": "aunt/uncle", "level2": "grand-aunt/uncle", "greatPrefix": "great-", "root": "grand-aunt/uncle" },
+    "male":   { "level1": "uncle", "level2": "grand-uncle", "greatPrefix": "great-", "root": "grand-uncle" },
+    "female": { "level1": "aunt",  "level2": "grand-aunt",  "greatPrefix": "great-", "root": "grand-aunt" }
+  },
+  "niece_nephew": { "level1": "niece/nephew", "level2": "grand-niece/nephew", "greatPrefix": "great-", "root": "grand-niece/nephew", "greatTemplate": "great-{n}-grand-niece/nephew",
+    "neutral": { "level1": "niece/nephew", "level2": "grand-niece/nephew", "greatPrefix": "great-", "root": "grand-niece/nephew" },
+    "male":   { "level1": "nephew", "level2": "grand-nephew", "greatPrefix": "great-", "root": "grand-nephew" },
+    "female": { "level1": "niece",  "level2": "grand-niece",  "greatPrefix": "great-", "root": "grand-niece" }
+  },
     "cousin": {
       "degreeTemplate": "{ordinal} cousin",
       "removedOnce": "{base} once removed",
@@ -33,7 +49,10 @@
     },
     "greatPrefix": "पर", 
     "root": "हजुरबा/हजुरआमा", 
-    "greatTemplate": "परहजुर{n}-बा/आमा" 
+    "greatTemplate": "परहजुर{n}-बा/आमा",
+    "neutral": { "level1": "बा/आमा", "level2": "हजुरबा/हजुरआमा", "greatPrefix": "पर", "root": "हजुरबा/हजुरआमा" },
+    "male":   { "level1": "बाबु",    "level2": "हजुरबा",        "greatPrefix": "पर", "root": "हजुरबा" },
+    "female": { "level1": "आमा",     "level2": "हजुरआमा",       "greatPrefix": "पर", "root": "हजुरआमा" }
   },
   "descendant": { 
     "level1": "छोरा/छोरी", 
@@ -45,7 +64,10 @@
     },
     "greatPrefix": "पर", 
     "root": "नाति/नातिनी", 
-    "greatTemplate": "परनाति{n}" 
+    "greatTemplate": "परनाति{n}",
+    "neutral": { "level1": "छोरा/छोरी", "level2": "नाति/नातिनी", "greatPrefix": "पर", "root": "नाति/नातिनी" },
+    "male":   { "level1": "छोरा",      "level2": "नाति",          "greatPrefix": "पर", "root": "नाति" },
+    "female": { "level1": "छोरी",      "level2": "नातिनी",        "greatPrefix": "पर", "root": "नातिनी" }
   },
     "sibling": { "full": "दाजुभाइ/दिदीबहिनी", "half": "सौतेनी दाजुभाइ/दिदीबहिनी" },
     "step": { "parent": "सौतेनी बाबु/आमा", "child": "सौतेनी छोरा/छोरी", "sibling": "सौतेनी दाजुभाइ/दिदीबहिनी" },
@@ -58,7 +80,10 @@
     },
     "greatPrefix": "पर", 
     "root": "हजुर काका/काकी", 
-    "greatTemplate": "परहजुर{n} काका/काकी" 
+    "greatTemplate": "परहजुर{n} काका/काकी",
+    "neutral": { "level1": "काका/काकी", "level2": "हजुर काका/काकी", "greatPrefix": "पर", "root": "हजुर काका/काकी" },
+    "male":   { "level1": "काका",       "level2": "हजुर काका",       "greatPrefix": "पर", "root": "हजुर काका" },
+    "female": { "level1": "काकी",       "level2": "हजुर काकी",       "greatPrefix": "पर", "root": "हजुर काकी" }
   },
   "niece_nephew": { 
     "level1": "भदै", 
@@ -69,7 +94,10 @@
     },
     "greatPrefix": "पर", 
     "root": "हजुर भदै", 
-    "greatTemplate": "परहजुर{n} भदै" 
+    "greatTemplate": "परहजुर{n} भदै",
+    "neutral": { "level1": "भदै",        "level2": "हजुर भदै",   "greatPrefix": "पर", "root": "हजुर भदै" },
+    "male":   { "level1": "भतिजो",      "level2": "हजुर भतिजो", "greatPrefix": "पर", "root": "हजुर भतिजो" },
+    "female": { "level1": "भतिजी/भान्जी", "level2": "हजुर भतिजी/भान्जी", "greatPrefix": "पर", "root": "हजुर भतिजी/भान्जी" }
   },
     "cousin": {
       "degreeTemplate": "{ordinal} कजिन",
@@ -82,9 +110,36 @@
     "unrelated": "रक्त सम्बन्ध छैन"
     ,
     "affinal": {
+      
       "sibling": "भिनाजु/देवर/सालो/साली",
-      "ancestor": { "level1": "ससुरा/सासू", "level2": "हजुर ससुरा/हजुर सासू", "greatPrefix": "पर", "root": "हजुर ससुरा/हजुर सासू" },
-      "descendant": { "level1": "बुहारी/ज्वाइँ", "level2": "हजुर बुहारी/हजुर ज्वाइँ", "greatPrefix": "पर", "root": "हजुर बुहारी/हजुर ज्वाइँ" }
+      "ancestor": {
+        "neutral": { "level1": "ससुरा/सासू", "level2": "हजुर ससुरा/हजुर सासू", "greatPrefix": "पर", "root": "हजुर ससुरा/हजुर सासू" },
+        "male":   { "level1": "ससुरा",       "level2": "हजुर ससुरा",       "greatPrefix": "पर", "root": "हजुर ससुरा" },
+        "female": { "level1": "सासू",        "level2": "हजुर सासू",        "greatPrefix": "पर", "root": "हजुर सासू" }
+      },
+      "descendant": {
+        "neutral": { "level1": "बुहारी/ज्वाइँ", "level2": "हजुर बुहारी/हजुर ज्वाइँ", "greatPrefix": "पर", "root": "हजुर बुहारी/हजुर ज्वाइँ" },
+        "male":   { "level1": "ज्वाइँ",        "level2": "हजुर ज्वाइँ",        "greatPrefix": "पर", "root": "हजुर ज्वाइँ" },
+        "female": { "level1": "बुहारी",       "level2": "हजुर बुहारी",       "greatPrefix": "पर", "root": "हजुर बुहारी" }
+      },
+      "aunt_uncle": {
+        "neutral": { "level1": "सम्बन्धी काका/काकी ससुराली", "level2": "हजुर सम्बन्धी काका/काकी ससुराली" },
+        "male":   { "level1": "काका ससुराली", "level2": "हजुर काका ससुराली" },
+        "female": { "level1": "काकी ससुराली", "level2": "हजुर काकी ससुराली" }
+      },
+      "niece_nephew": {
+        "neutral": { "level1": "भतिजो/भतिजी ससुराली", "level2": "हजुर भतिजो/भतिजी ससुराली" },
+        "male":   { "level1": "भतिजो ससुराली", "level2": "हजुर भतिजो ससुराली" },
+        "female": { "level1": "भतिजी ससुराली", "level2": "हजुर भतिजी ससुराली" }
+      },
+      "cousin": {
+        "neutral": { "degreeTemplate": "{ordinal} कजिन ससुराली", "removedOnce": "{base} एक पटक हटाइएको", "removedTwice": "{base} दुई पटक हटाइएको", "removedMany": "{base} {n} पटक हटाइएको" }
+      },
+      "siblingBySpouseGender": {
+        "female": "सालो/साली",
+        "male": "देवर/नन्द/भाउजू/जेठानी",
+        "neutral": "भिनाजु/देवर/सालो/साली"
+      }
     }
   }
 }
