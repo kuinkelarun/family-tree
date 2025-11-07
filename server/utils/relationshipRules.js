@@ -306,6 +306,16 @@ export function validateProposedRelationship(graph, fromId, toId, type, options 
       errors.push('Cannot create spouse relationship between siblings');
       ruleIds.push('no-incest-siblings');
     }
+    // Disallow spouse between co-spouses (share at least one common spouse)
+    const spA = Array.from(spousesOf.get(fromId) || []);
+    const spBSet = new Set(spousesOf.get(toId) || []);
+    const shared = spA.filter((s) => spBSet.has(s));
+    if (shared.length > 0) {
+      const names = shared.slice(0, 2).map((id) => (index.get(id)?.name || 'a shared spouse'));
+      const hint = names.length === 1 ? names[0] : names.join(', ');
+      errors.push(`Cannot create spouse relationship between co-spouses (they share a spouse: ${hint}).`);
+      ruleIds.push('no-spouse-between-co-spouses');
+    }
   }
 
   // r7: optional soft warnings (e.g., many spouses)

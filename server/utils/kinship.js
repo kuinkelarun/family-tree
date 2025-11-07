@@ -379,6 +379,15 @@ export function overlayAffinalStep(A, B, graphs, options = {}) {
   const { parentsOf, spousesOf } = graphs;
   const a = String(A), b = String(B);
 
+  // Co-spouses / ex-spouses: A and B share at least one common spouse
+  const spA = spousesOf.get(a) || new Set();
+  const spB = spousesOf.get(b) || new Set();
+  const shared = [];
+  for (const s of spA) if (spB.has(s)) shared.push(s);
+  if (shared.length > 0) {
+    return { label: 'co-spouse/ex-spouse', class: 'affinal', meta: { relationCode: { type: 'co_spouse' }, affinal: true, step: false, sharedSpouseIds: shared } };
+  }
+
   // Step-parent / step-child
   // A is spouse of a parent of B (but not a parent) => A is step-parent of B
   for (const p of (parentsOf.get(b) || [])) {

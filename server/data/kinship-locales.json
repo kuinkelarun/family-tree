@@ -3,6 +3,9 @@
     "affinalSuffix": " in-law",
     "self": "self",
     "spouse": "spouse",
+    "affinal": {
+      "co_spouse": "co-spouse/ex-spouse"
+    },
   "ancestor": { "level1": "parent", "level2": "grandparent", "greatPrefix": "great-", "root": "grandparent", "greatTemplate": "great-{n}-grandparent",
     "neutral": { "level1": "parent", "level2": "grandparent", "greatPrefix": "great-", "root": "grandparent" },
     "male":   { "level1": "father", "level2": "grandfather", "greatPrefix": "great-", "root": "grandfather" },
@@ -110,6 +113,7 @@
     "unrelated": "रक्त सम्बन्ध छैन"
     ,
     "affinal": {
+      "co_spouse": "सह-जीवनसाथी/पूर्व-जीवनसाथी",
       
       "sibling": "भिनाजु/देवर/सालो/साली",
       "ancestor": {

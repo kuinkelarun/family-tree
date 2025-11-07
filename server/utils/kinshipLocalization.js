@@ -61,6 +61,7 @@ export function localizeKinship(result, locale = 'en', options = {}) {
   switch (code.type) {
     case 'self': return dict.self;
     case 'spouse': return dict.spouse;
+    case 'co_spouse': return (dict.affinal && dict.affinal.co_spouse) || dict.co_spouse || (result?.label || 'co-spouse');
     case 'ancestor': {
       const sec = resolveTierSection(dict.ancestor, desiredGender);
       return affinalizeOut('ancestor', formatTier(sec, code.level), code.level);

@@ -35,6 +35,7 @@ Errors (block the action):
 - no-grandchild-as-child: Do not connect a descendant (>= grandchild) as a direct child when the chain already exists.
 - no-incest-ancestor-descendant: Cannot create spouse relationship between ancestor and descendant.
 - no-incest-siblings: Cannot create spouse relationship between siblings.
+- no-spouse-between-co-spouses: Cannot create spouse relationship between two people who already share a spouse (co-spouses/ex-spouses); suggests the shared spouse in message.
 - no-siblings-ancestor-descendant: Cannot create sibling relationship between ancestor and descendant.
 - no-siblings-between-spouses: Cannot create sibling relationship between spouses.
 - no-direct-between-inlaws: Cannot create parent/child/sibling/spouse relationship directly between a parent-in-law and a child-in-law (e.g., parent of spouse vs. spouse of child). Error messages include directional context.
