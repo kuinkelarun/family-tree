@@ -1300,6 +1300,9 @@ function App() {
               validationFailures.push({ parentId, errors: v.errors });
               continue;
             }
+            if (v.warnings && v.warnings.length) {
+              showToast(`Warning for ${parentId} -> ${tgt}: ${v.warnings.join('; ')}`);
+            }
             // mark as authored so layout/visualization preserves the direction as entered by the user
             ops.push(Relationships.create({ fromMemberId: parentId, toMemberId: tgt, type: 'child', label: 'child', authored: true }));
           } catch (ve) {
@@ -1342,6 +1345,9 @@ function App() {
       if (!v.ok) {
         showToast(`Validation failed: ${v.errors.join('; ')}`);
         return;
+      }
+      if (v.warnings && v.warnings.length) {
+        showToast(`Note: ${v.warnings.join('; ')}`);
       }
       // Remove any preview once we commit (we'll show the real edge after reload)
       // Keeping the preview until after loadTree would avoid any single-frame overlap, but both are acceptable.

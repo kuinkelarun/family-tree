@@ -383,13 +383,13 @@ export function overlayAffinalStep(A, B, graphs, options = {}) {
   // A is spouse of a parent of B (but not a parent) => A is step-parent of B
   for (const p of (parentsOf.get(b) || [])) {
     if ((spousesOf.get(p) || new Set()).has(a) && !(parentsOf.get(b) || new Set()).has(a)) {
-      return { label: 'step-parent', class: 'step', meta: { role: 'step-parent', viaParent: p, affinal: false, step: true } };
+      return { label: 'step-parent', class: 'step', meta: { role: 'parent', viaParent: p, affinal: false, step: true, relationCode: { type: 'step', role: 'parent' } } };
     }
   }
   // B is spouse of a parent of A (but not a parent) => A is step-child of B
   for (const p of (parentsOf.get(a) || [])) {
     if ((spousesOf.get(p) || new Set()).has(b) && !(parentsOf.get(a) || new Set()).has(b)) {
-      return { label: 'step-child', class: 'step', meta: { role: 'step-child', viaParent: p, affinal: false, step: true } };
+      return { label: 'step-child', class: 'step', meta: { role: 'child', viaParent: p, affinal: false, step: true, relationCode: { type: 'step', role: 'child' } } };
     }
   }
 
@@ -401,7 +401,7 @@ export function overlayAffinalStep(A, B, graphs, options = {}) {
       const sp = spousesOf.get(pa) || new Set();
       for (const pb of pB) {
         if (sp.has(pb)) {
-          return { label: 'step-sibling', class: 'step', meta: { viaParents: [pa, pb], affinal: false, step: true } };
+          return { label: 'step-sibling', class: 'step', meta: { role: 'sibling', viaParents: [pa, pb], affinal: false, step: true, relationCode: { type: 'step', role: 'sibling' } } };
         }
       }
     }

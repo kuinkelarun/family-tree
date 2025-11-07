@@ -8,7 +8,7 @@ import Member from '../models/Member.js';
  */
 export async function loadTreeGraph(treeId) {
   const members = await Member.find({ tree: treeId })
-    .select('_id relationships')
+    .select('_id name generation relationships')
     .lean();
   const index = new Map(members.map((m) => [String(m._id), m]));
   const parentsOf = new Map();
@@ -185,16 +185,20 @@ export function validateProposedRelationship(graph, fromId, toId, type, options 
   const ancOfTo = ancestorsOf(toId, parentsOf, 10);
   const descOfTo = descendantsOf(toId, childrenOf, 10);
 
-  // r3: prevent cycles for parent/child
+  // r3: prevent cycles for parent/child (include explanatory distances)
   if (type === 'parent') {
     // Setting toId as parent of fromId: if fromId is already an ancestor of toId, it creates a cycle
     if (ancOfTo.has(fromId)) {
-      errors.push('Would create an ancestor cycle');
+      const nameFrom = index.get(fromId)?.name || 'Source';
+      const nameTo = index.get(toId)?.name || 'Target';
+      errors.push(`Cannot set ${nameTo} as parent of ${nameFrom}: this would create a cycle because ${nameFrom} is already an ancestor of ${nameTo}.`);
       ruleIds.push('no-cycle');
     }
   } else if (type === 'child') {
     if (descOfTo.has(fromId)) {
-      errors.push('Would create a descendant cycle');
+      const nameFrom = index.get(fromId)?.name || 'Source';
+      const nameTo = index.get(toId)?.name || 'Target';
+      errors.push(`Cannot set ${nameTo} as child of ${nameFrom}: this would create a cycle because ${nameFrom} is already an ancestor of ${nameTo}.`);
       ruleIds.push('no-cycle');
     }
   }
@@ -216,14 +220,62 @@ export function validateProposedRelationship(graph, fromId, toId, type, options 
     // toId should be a direct parent only if not already a grand/ancestor (distance >= 2)
     const dist = anc.get(toId);
     if (typeof dist === 'number' && dist >= 2) {
-      errors.push('Member already connected as an ancestor (use existing chain, not a direct parent)');
+      const nameFrom = index.get(fromId)?.name || 'Source';
+      const nameTo = index.get(toId)?.name || 'Target';
+      const relWord = dist === 2 ? 'grandparent' : `great-${'great-'.repeat(dist - 3)}grandparent`;
+      errors.push(`Cannot set ${nameTo} as parent of ${nameFrom}: ${nameTo} is already a ${relWord} of ${nameFrom} via existing connections.`);
       ruleIds.push('no-grandparent-as-parent');
     }
   } else if (type === 'child') {
     const dist = desc.get(toId);
     if (typeof dist === 'number' && dist >= 2) {
-      errors.push('Member already connected as a descendant (use existing chain, not a direct child)');
+      const nameFrom = index.get(fromId)?.name || 'Source';
+      const nameTo = index.get(toId)?.name || 'Target';
+      const relWord = dist === 2 ? 'grandchild' : `great-${'great-'.repeat(dist - 3)}grandchild`;
+      errors.push(`Cannot set ${nameTo} as child of ${nameFrom}: ${nameTo} is already a ${relWord} of ${nameFrom} via existing connections.`);
       ruleIds.push('no-grandchild-as-child');
+    }
+  }
+
+  // r9: generation order integrity (use generation numbers when available)
+  const genFrom = index.get(fromId)?.generation ?? null;
+  const genTo = index.get(toId)?.generation ?? null;
+  if (genFrom !== null && genTo !== null) {
+    const nameFrom = index.get(fromId)?.name || 'Source';
+    const nameTo = index.get(toId)?.name || 'Target';
+    if (type === 'parent') {
+      // parent (to) should be in an earlier (smaller) generation than child (from)
+      if (genTo >= genFrom) {
+        const hasKnownTopo = ancOfTo.has(fromId) || descOfTo.has(fromId) || anc.has(toId) || desc.has(toId);
+        // Try to clarify using ancestor/descendant maps if available
+        const dist = anc.get(toId);
+        if (typeof dist === 'number' && dist >= 1) {
+          const relWord = dist === 1 ? 'parent' : dist === 2 ? 'grandparent' : `great-${'great-'.repeat(dist - 3)}grandparent`;
+          errors.push(`Cannot set ${nameTo} as parent of ${nameFrom}: ${nameTo} is already a ${relWord} of ${nameFrom}.`);
+          ruleIds.push('generation-order');
+        } else if (descOfTo.has(fromId)) {
+          errors.push(`Cannot set ${nameTo} as parent of ${nameFrom}: ${nameFrom} is already a descendant of ${nameTo}.`);
+          ruleIds.push('generation-order');
+        } else {
+          // No known topology between the two; do not warn to avoid noisy hints on isolated nodes
+        }
+      }
+    } else if (type === 'child') {
+      // child (to) should be in a later (larger) generation than parent (from)
+      if (genTo <= genFrom) {
+        const hasKnownTopo = ancOfTo.has(fromId) || descOfTo.has(fromId) || anc.has(toId) || desc.has(toId);
+        const dist = desc.get(toId);
+        if (typeof dist === 'number' && dist >= 1) {
+          const relWord = dist === 1 ? 'child' : dist === 2 ? 'grandchild' : `great-${'great-'.repeat(dist - 3)}grandchild`;
+          errors.push(`Cannot set ${nameTo} as child of ${nameFrom}: ${nameTo} is already a ${relWord} of ${nameFrom}.`);
+          ruleIds.push('generation-order');
+        } else if (ancOfTo.has(fromId)) {
+          errors.push(`Cannot set ${nameTo} as child of ${nameFrom}: ${nameTo} is already an ancestor of ${nameFrom}.`);
+          ruleIds.push('generation-order');
+        } else {
+          // No known topology between the two; do not warn to avoid noisy hints on isolated nodes
+        }
+      }
     }
   }
 
@@ -265,10 +317,15 @@ export function validateProposedRelationship(graph, fromId, toId, type, options 
     }
   }
 
-  // r8: in-law constraint — block direct child/sibling/spouse links between parent-in-law and child-in-law
-  if (type === 'child' || type === 'sibling' || type === 'spouse') {
-    if (areParentInLawAndChildInLaw(fromId, toId, { parentsOf, childrenOf, spousesOf })) {
-      errors.push('Cannot create direct child/sibling/spouse relationship between parent-in-law and child-in-law');
+  // r8: in-law constraint — block direct parent/child/sibling/spouse links between parent-in-law and child-in-law
+  if (type === 'parent' || type === 'child' || type === 'sibling' || type === 'spouse') {
+    const inlaw = getInLawRelation(fromId, toId, { parentsOf, childrenOf, spousesOf });
+    if (inlaw) {
+      const nameFrom = index.get(fromId)?.name || 'Source';
+      const nameTo = index.get(toId)?.name || 'Target';
+      // Build a directional message that explains the specific in-law relation
+      const msg = `Invalid connection: ${nameTo} is the ${inlaw.bIs} of ${nameFrom}, and cannot be set as ${type}.`;
+      errors.push(msg);
       ruleIds.push('no-direct-between-inlaws');
     }
   }
@@ -284,21 +341,21 @@ export async function validateForTree(treeId, fromId, toId, type, options) {
   return validateProposedRelationship(graph, String(fromId), String(toId), type, options);
 }
 
-function areParentInLawAndChildInLaw(a, b, { parentsOf, childrenOf, spousesOf }) {
-  // Check if b is parent of any spouse of a
+function getInLawRelation(a, b, { parentsOf, childrenOf, spousesOf }) {
+  // If b is parent of any spouse of a => b is parent-in-law of a; a is child-in-law of b
   for (const s of (spousesOf.get(a) || [])) {
-    if ((parentsOf.get(s) || new Set()).has(b)) return true;
+    if ((parentsOf.get(s) || new Set()).has(b)) return { aIs: 'child-in-law', bIs: 'parent-in-law' };
   }
-  // Check if b is spouse of any child of a
+  // If b is spouse of any child of a => b is child-in-law of a; a is parent-in-law of b
   for (const c of (childrenOf.get(a) || [])) {
-    if ((spousesOf.get(c) || new Set()).has(b)) return true;
+    if ((spousesOf.get(c) || new Set()).has(b)) return { aIs: 'parent-in-law', bIs: 'child-in-law' };
   }
-  // Symmetric
+  // Symmetric checks
   for (const s of (spousesOf.get(b) || [])) {
-    if ((parentsOf.get(s) || new Set()).has(a)) return true;
+    if ((parentsOf.get(s) || new Set()).has(a)) return { aIs: 'parent-in-law', bIs: 'child-in-law' };
   }
   for (const c of (childrenOf.get(b) || [])) {
-    if ((spousesOf.get(c) || new Set()).has(a)) return true;
+    if ((spousesOf.get(c) || new Set()).has(a)) return { aIs: 'child-in-law', bIs: 'parent-in-law' };
   }
-  return false;
+  return null;
 }
