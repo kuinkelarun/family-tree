@@ -24,8 +24,11 @@ export async function addRelationship(req, res) {
         throw new Error('Forbidden');
 
       // Load graph once for semantic validation
-      const graph = await loadTreeGraph(from.tree);
-      const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create' });
+    const graph = await loadTreeGraph(from.tree);
+    // Normalize severities which may be stored as a Map (Mongoose) or plain object (lean/JSON)
+    const rawSev = tree.validationConfig?.severities;
+    const severities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
+    const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create', severityOverrides: severities });
       if (!v.ok) {
         return { ok: false, error: 'Validation failed', errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds };
       }
@@ -94,9 +97,11 @@ export async function updateRelationship(req, res) {
       if (idx === -1) throw new Error('Relationship not found');
 
       // Validate the proposed new type before applying
-      const graph = await loadTreeGraph(from.tree);
-      const nextType = newType || type;
-      const v = validateProposedRelationship(graph, String(from._id), String(to._id), nextType, { mode: 'update', previousType: type });
+  const graph = await loadTreeGraph(from.tree);
+  const nextType = newType || type;
+  const rawSev = tree.validationConfig?.severities;
+  const severities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
+  const v = validateProposedRelationship(graph, String(from._id), String(to._id), nextType, { mode: 'update', previousType: type, severityOverrides: severities });
       if (!v.ok) {
         return { ok: false, error: 'Validation failed', errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds };
       }
@@ -161,8 +166,10 @@ export async function validateRelationship(req, res) {
     const tree = await FamilyTree.findById(from.tree);
     if (!(tree.owner.equals(req.user.id) || tree.permissions.some((p) => p.user.equals(req.user.id) && p.access !== 'viewer')))
       return res.status(403).json({ error: 'Forbidden' });
-    const graph = await loadTreeGraph(from.tree);
-    const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create' });
+  const graph = await loadTreeGraph(from.tree);
+  const rawSev = tree.validationConfig?.severities;
+  const severities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
+  const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create', severityOverrides: severities });
     return res.json({ ok: v.ok, errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds });
   } catch (e) {
     return res.status(500).json({ error: e.message });

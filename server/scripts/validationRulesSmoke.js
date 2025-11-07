@@ -122,6 +122,35 @@ function run() {
   r = validateProposedRelationship(graph, 'X', 'G', 'parent', { mode: 'create' });
   assert(!r.ok && r.ruleIds.includes('no-grandparent-as-parent'), 'block setting grandparent as parent');
 
+  // Scenario 5: spouse-of-ancestor and co-spouse-of-ancestor cannot be parent/child/spouse of descendant
+  // Setup: 4 is grandparent of 21; 10 spouse of 4; 14 spouse of 4; 21 descendant of 14
+  const p4 = { _id: '4', name: '4', relationships: [] };
+  const p10 = { _id: '10', name: '10', relationships: [ { type: 'spouse', relative: '4' } ] };
+  p4.relationships.push({ type: 'spouse', relative: '10' });
+  const p14 = { _id: '14', name: '14', relationships: [ { type: 'spouse', relative: '4' } ] };
+  p4.relationships.push({ type: 'spouse', relative: '14' });
+  const p30 = { _id: '30', name: '30', relationships: [ { type: 'parent', relative: '14' } ] };
+  p14.relationships.push({ type: 'child', relative: '30' });
+  const p21 = { _id: '21', name: '21', relationships: [ { type: 'parent', relative: '30' } ] };
+  p30.relationships.push({ type: 'child', relative: '21' });
+  // Now 4 is grandparent of 21 via 14->30->21. 10 is spouse of 4; 14 is co-spouse with 10.
+  graph = buildGraph([p4, p10, p14, p30, p21]);
+  r = validateProposedRelationship(graph, '10', '21', 'spouse', { mode: 'create' });
+  assert(!r.ok && (r.ruleIds.includes('no-direct-affinal-ancestor-descendant') || r.ruleIds.includes('no-direct-co-spouse-of-ancestor')), 'block spouse between spouse-of-ancestor and descendant');
+  r = validateProposedRelationship(graph, '10', '21', 'parent', { mode: 'create' });
+  assert(!r.ok && (r.ruleIds.includes('no-direct-affinal-ancestor-descendant') || r.ruleIds.includes('no-direct-co-spouse-of-ancestor')), 'block parent link from spouse-of-ancestor to descendant');
+  r = validateProposedRelationship(graph, '10', '21', 'child', { mode: 'create' });
+  assert(!r.ok && (r.ruleIds.includes('no-direct-affinal-ancestor-descendant') || r.ruleIds.includes('no-direct-co-spouse-of-ancestor')), 'block child link to spouse-of-ancestor from descendant');
+
+  // Scenario 6: step-parent carve-out — allow direct parent/child edge with warning
+  // 6 is parent of 2; 5 is spouse of 6; creating 5 -> child 2 should be allowed with a warning
+  const s5 = { _id: '5', name: '5', relationships: [ { type: 'spouse', relative: '6' } ] };
+  const s6 = { _id: '6', name: '6', relationships: [ { type: 'spouse', relative: '5' }, { type: 'child', relative: '2' } ] };
+  const s2 = { _id: '2', name: '2', relationships: [ { type: 'parent', relative: '6' } ] };
+  graph = buildGraph([s5, s6, s2]);
+  r = validateProposedRelationship(graph, '5', '2', 'child', { mode: 'create' });
+  assert(r.ok && r.ruleIds.includes('warn-direct-step-parent-link') && r.warnings.length > 0, 'allow step-parent direct child link with warning');
+
   console.log('\nAll validation smoke tests PASSED');
 }
 

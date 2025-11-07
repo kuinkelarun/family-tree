@@ -43,6 +43,21 @@ function run() {
   console.log('Step-sibling EN:', rc4.label, '| NP:', localizeKinship(rc4, 'np'));
   assert(rc4.label === 'step-sibling' && rc4.meta?.relationCode?.type === 'step' && rc4.meta?.relationCode?.role === 'sibling', 'classify step-sibling with relationCode role=sibling');
 
+  // Aunt/Uncle vs Niece/Nephew (MRCA path): 30 is sibling of 4; 13 is child of 4
+  const members4 = [
+    { _id: 'GP1', relationships: [] },
+    { _id: 'GP2', relationships: [] },
+    { _id: '4', relationships: [ { type: 'parent', relative: 'GP1' }, { type: 'parent', relative: 'GP2' }, { type: 'child', relative: '13' } ] },
+    { _id: '30', relationships: [ { type: 'parent', relative: 'GP1' }, { type: 'parent', relative: 'GP2' } ] },
+    { _id: '13', relationships: [ { type: 'parent', relative: '4' } ] },
+  ];
+  const rc5 = kinshipBetween('13', '30', members4, { depthLimit: 6 });
+  console.log('13 vs 30 EN:', rc5.label, '| NP:', localizeKinship(rc5, 'np'));
+  assert(rc5.label === 'niece/nephew' && rc5.meta?.relationCode?.type === 'niece_nephew', 'classify 13 as niece/nephew of 30');
+  const rc6 = kinshipBetween('30', '13', members4, { depthLimit: 6 });
+  console.log('30 vs 13 EN:', rc6.label, '| NP:', localizeKinship(rc6, 'np'));
+  assert(rc6.label === 'aunt/uncle' && rc6.meta?.relationCode?.type === 'aunt_uncle', 'classify 30 as aunt/uncle of 13');
+
   console.log('\nAll kinship overlay smoke tests PASSED');
 }
 

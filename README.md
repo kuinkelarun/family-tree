@@ -30,6 +30,8 @@ See `.env.example` for all variables. Minimal:
 
 The API enforces relationship integrity (e.g., prevents parent/child between siblings, spouse between ancestor/descendant, and duplicate edges). A validation-only endpoint is available at `POST /api/relationships/validate` for client prechecks. See `VALIDATION-RULES.md` for details and how to extend rules.
 
+Admin users can configure per-tree rule severities (error|warn|off) from the Admin console (`#/admin`). The rule list and defaults are provided by the server. See `VALIDATION-RULE-METADATA.md` for the Admin API and usage.
+
 ## Setup Instructions
 
 ### 1. Clone the repository

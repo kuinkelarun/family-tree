@@ -18,6 +18,14 @@ const FamilyTreeSchema = new mongoose.Schema(
       visibility: { type: String, enum: ['private', 'shared', 'public'], default: 'private' },
       styles: { type: Object, default: {} },
     },
+    validationConfig: {
+      severities: {
+        // ruleId -> 'error' | 'warn' | 'off'
+        type: Map,
+        of: { type: String, enum: ['error', 'warn', 'off'] },
+        default: new Map(),
+      },
+    },
     // Visual-only nodes for bundling connections (virtual marriage points)
     marriagePoints: {
       type: [

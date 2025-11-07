@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import net from 'net';
 
 // Track DB diagnostics for troubleshooting
 let lastDbError = null;
@@ -99,11 +100,61 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 
-const PORT = process.env.PORT || 4000;
+const PORT = parseInt(process.env.PORT || '4000', 10);
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/family_tree';
 
-// Start server regardless of DB connectivity so /health is reachable during local setup
-app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
+// Find an available port starting at PORT and falling back to the next few numbers if needed
+function isPortFree(port) {
+  return new Promise((resolve) => {
+    const tester = net.createServer()
+      .once('error', (err) => {
+        if (err && err.code === 'EADDRINUSE') resolve(false);
+        else resolve(false);
+      })
+      .once('listening', () => {
+        tester.once('close', () => resolve(true)).close();
+      })
+      .listen(port, '0.0.0.0');
+  });
+}
+
+async function findAvailablePort(start, attempts = 10) {
+  let port = start;
+  for (let i = 0; i < attempts; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const free = await isPortFree(port);
+    if (free) return port;
+    port += 1;
+  }
+  return start; // fallback to requested if all attempts failed
+}
+
+let httpServer = null;
+async function startHttp() {
+  const chosen = await findAvailablePort(PORT, 10);
+  httpServer = app.listen(chosen, () => {
+    console.log(`API running on http://localhost:${chosen}${chosen !== PORT ? ` (requested ${PORT} was busy)` : ''}`);
+  });
+  httpServer.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.error(`Port ${chosen} is already in use. Set PORT to a different value or stop the conflicting process.`);
+    } else {
+      console.error('HTTP server error:', err?.message || err);
+    }
+  });
+}
+startHttp();
+
+// Graceful shutdown
+function shutdown() {
+  if (httpServer) {
+    try { httpServer.close(() => process.exit(0)); } catch { process.exit(0); }
+  } else {
+    process.exit(0);
+  }
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 // Connect to MongoDB with retry/backoff logic to handle transient network issues.
 async function connectWithRetry() {

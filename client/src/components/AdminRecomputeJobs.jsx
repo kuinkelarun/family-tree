@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Admin } from '../utils/api.js';
 
-export default function AdminRecomputeJobs({ onClose }) {
+export default function AdminRecomputeJobs({ onClose, embedded = false }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
@@ -53,12 +53,12 @@ export default function AdminRecomputeJobs({ onClose }) {
   }
 
   return (
-    <div style={{ position: 'fixed', left: 80, top: 80, right: 80, bottom: 80, background: '#fff', borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', zIndex: 1200, padding: 16, overflow: 'auto' }}>
+    <div style={embedded ? { padding: 12 } : { position: 'fixed', left: 80, top: 80, right: 80, bottom: 80, background: '#fff', borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', zIndex: 1200, padding: 16, overflow: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <h3 style={{ margin: 0 }}>Recompute Queue</h3>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button onClick={load} style={{ padding: '6px 8px', borderRadius: 6 }}>Refresh</button>
-          <button onClick={onClose} style={{ padding: '6px 8px', borderRadius: 6, background: '#ef4444', color: '#fff' }}>Close</button>
+          {!embedded && <button onClick={onClose} style={{ padding: '6px 8px', borderRadius: 6, background: '#ef4444', color: '#fff' }}>Close</button>}
         </div>
       </div>
       <hr />

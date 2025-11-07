@@ -3,6 +3,32 @@
 
 import Member from '../models/Member.js';
 
+// Public metadata for validation rules: id, description, defaultSeverity
+// Keep ids exactly in sync with ruleIds pushed in validateProposedRelationship
+export const validationRuleMetadata = [
+  { id: 'no-self', description: 'Cannot create a relationship with self.', defaultSeverity: 'error' },
+  { id: 'same-tree', description: 'Both members must belong to the same tree.', defaultSeverity: 'error' },
+  { id: 'no-duplicate', description: 'Duplicate relationship already exists.', defaultSeverity: 'error' },
+  { id: 'no-duplicate-reciprocal', description: 'Duplicate exists via reciprocal entry.', defaultSeverity: 'error' },
+  { id: 'max-two-parents', description: 'Members cannot have more than two parents.', defaultSeverity: 'error' },
+  { id: 'no-cycle', description: 'Prevents cycles in ancestry (parent/child).', defaultSeverity: 'error' },
+  { id: 'no-parent-child-between-siblings', description: 'Siblings cannot be linked as parent/child.', defaultSeverity: 'error' },
+  { id: 'no-parent-child-between-spouses', description: 'Spouses cannot be linked as parent/child.', defaultSeverity: 'error' },
+  { id: 'no-grandparent-as-parent', description: 'Blocks setting a grandparent (or higher) as direct parent.', defaultSeverity: 'error' },
+  { id: 'no-grandchild-as-child', description: 'Blocks setting a grandchild (or lower) as direct child.', defaultSeverity: 'error' },
+  { id: 'generation-order', description: 'Enforces plausible generation ordering when known.', defaultSeverity: 'error' },
+  { id: 'no-siblings-ancestor-descendant', description: 'Cannot set siblings between ancestor and descendant.', defaultSeverity: 'error' },
+  { id: 'no-siblings-between-spouses', description: 'Cannot set siblings between spouses.', defaultSeverity: 'error' },
+  { id: 'no-incest-ancestor-descendant', description: 'Blocks spouse relationship between ancestor and descendant.', defaultSeverity: 'error' },
+  { id: 'no-incest-siblings', description: 'Blocks spouse relationship between siblings.', defaultSeverity: 'error' },
+  { id: 'no-spouse-between-co-spouses', description: 'Blocks spouse relationship between co-spouses (share a spouse).', defaultSeverity: 'error' },
+  { id: 'warn-multiple-spouses', description: 'Warn when adding additional spouses.', defaultSeverity: 'warn' },
+  { id: 'no-direct-between-inlaws', description: 'Blocks direct links between in-law relations (parent/child/sibling/spouse).', defaultSeverity: 'error' },
+  { id: 'no-direct-affinal-ancestor-descendant', description: 'Blocks direct links to spouse-of an ancestor.', defaultSeverity: 'error' },
+  { id: 'no-direct-co-spouse-of-ancestor', description: 'Blocks direct links to co-spouse of an ancestor.', defaultSeverity: 'error' },
+  { id: 'warn-direct-step-parent-link', description: 'Allows but warns on direct parent/child link to a step-parent.', defaultSeverity: 'warn' },
+];
+
 /**
  * Load minimal graph for a tree: id -> relationships
  */
@@ -130,6 +156,13 @@ function descendantsOf(startId, childrenOf, maxDepth = 10) {
 export function validateProposedRelationship(graph, fromId, toId, type, options = {}) {
   const { index, parentsOf, childrenOf, spousesOf, siblingsOf } = graph;
   const mode = options.mode || 'create';
+  const previousType = options.previousType;
+  const severityOverrides = options.severityOverrides || {}; // ruleId -> 'error'|'warn'|'off'
+
+  // Label-only update: when mode=update and type is unchanged, bypass structural validation entirely
+  if (mode === 'update' && previousType === type) {
+    return { ok: true, errors: [], warnings: [], ruleIds: [] };
+  }
 
   const errors = [];
   const warnings = [];
@@ -340,7 +373,128 @@ export function validateProposedRelationship(graph, fromId, toId, type, options 
     }
   }
 
-  return { ok: errors.length === 0, errors, warnings, ruleIds };
+  // r8c: affinal-ancestor constraints — block parent/child/spouse links between a descendant and
+  //      someone who is spouse-of an ancestor, or co-spouse of an ancestor.
+  //      Carve-out: if the ancestor distance is 1 (direct parent) and the attempted link is parent/child,
+  //      allow it (interpreted as making step-parent a direct parent) but emit a warning instead.
+  if (type === 'parent' || type === 'child' || type === 'spouse') {
+    const nameFrom = index.get(fromId)?.name || 'Source';
+    const nameTo = index.get(toId)?.name || 'Target';
+    // If a more specific topology rule already fired, avoid piling on affinal errors to reduce noise
+    const suppressAffinalMsg = ruleIds.some((id) => (
+      id === 'no-grandparent-as-parent' ||
+      id === 'no-grandchild-as-child' ||
+      id === 'no-cycle' ||
+      id === 'generation-order'
+    ));
+    // Set of ancestors of target (toId)
+    const ancestorsTo = Array.from(ancOfTo.keys());
+    // Helper to format ancestor name
+    const ancName = (aid) => index.get(aid)?.name || 'an ancestor';
+    // 8c-1: spouse-of-ancestor
+    for (const a of ancestorsTo) {
+      if ((spousesOf.get(a) || new Set()).has(fromId)) {
+        const dist = ancOfTo.get(a);
+        if (suppressAffinalMsg) {
+          // A more specific rule already communicated the contradiction; skip adding another
+        } else if ((type === 'parent' || type === 'child') && dist === 1) {
+          // Step-parent direct parent/child link: allow but warn
+          warnings.push(`Direct ${type} link between step-parent and step-child: ${nameFrom} is spouse of ${ancName(a)} (a parent of ${nameTo}). Ensure this is intended; this counts toward the two-parent limit.`);
+          ruleIds.push('warn-direct-step-parent-link');
+        } else {
+          errors.push(`Invalid connection: ${nameFrom} is the spouse of ${ancName(a)} (an ancestor of ${nameTo}); cannot be set as ${type}.`);
+          ruleIds.push('no-direct-affinal-ancestor-descendant');
+        }
+        break;
+      }
+    }
+    // 8c-2: co-spouse-of-ancestor (shares a spouse with an ancestor of target)
+    if (!ruleIds.includes('no-direct-affinal-ancestor-descendant') && !suppressAffinalMsg) {
+      const spFrom = spousesOf.get(fromId) || new Set();
+      for (const a of ancestorsTo) {
+        const spAnc = spousesOf.get(a) || new Set();
+        let shared = false;
+        for (const s of spFrom) { if (spAnc.has(s)) { shared = true; break; } }
+        if (shared) {
+          const dist = ancOfTo.get(a);
+          if ((type === 'parent' || type === 'child') && dist === 1) {
+            warnings.push(`Direct ${type} link between step-parent and step-child: ${nameFrom} is a co-spouse of ${ancName(a)} (a parent of ${nameTo}). Ensure this is intended; this counts toward the two-parent limit.`);
+            ruleIds.push('warn-direct-step-parent-link');
+          } else {
+            errors.push(`Invalid connection: ${nameFrom} is a co-spouse of ${ancName(a)} (an ancestor of ${nameTo}); cannot be set as ${type}.`);
+            ruleIds.push('no-direct-co-spouse-of-ancestor');
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Deduplicate messages and rule ids for cleanliness
+  const dedup = (arr) => Array.from(new Set(arr));
+  // Apply severity overrides
+  const finalErrors = [];
+  const finalWarnings = [];
+  for (const msg of errors) {
+    const matchedRuleIds = ruleIds.filter(id => msg.includes(id) || errors.length === 1); // heuristic fallback
+    // If no direct match, just keep original classification
+    const classificationIds = matchedRuleIds.length ? matchedRuleIds : ruleIds;
+    let suppressed = false;
+    for (const rid of classificationIds) {
+      const sev = severityOverrides[rid];
+      if (sev === 'off') { suppressed = true; break; }
+      if (sev === 'warn') {
+        finalWarnings.push(msg);
+        suppressed = true;
+        break;
+      }
+    }
+    if (!suppressed) finalErrors.push(msg);
+  }
+  for (const w of warnings) {
+    let downgraded = false;
+    for (const rid of ruleIds) {
+      const sev = severityOverrides[rid];
+      if (sev === 'off') { downgraded = true; break; }
+      if (sev === 'error') { finalErrors.push(w); downgraded = true; break; }
+    }
+    if (!downgraded) finalWarnings.push(w);
+  }
+
+  // Category collapse (topology, affinal, incest, duplicate, structural)
+  const categories = {
+    topology: ['no-grandparent-as-parent','no-grandchild-as-child','no-cycle','generation-order'],
+    incest: ['no-incest-ancestor-descendant','no-incest-siblings'],
+    adjacency: ['no-parent-child-between-siblings','no-parent-child-between-spouses','no-siblings-ancestor-descendant','no-siblings-between-spouses'],
+    marriage: ['no-spouse-between-co-spouses','warn-multiple-spouses'],
+    inlaw: ['no-direct-between-inlaws','no-direct-affinal-ancestor-descendant','no-direct-co-spouse-of-ancestor','warn-direct-step-parent-link'],
+    capacity: ['max-two-parents'],
+    duplicate: ['no-duplicate','no-duplicate-reciprocal'],
+  };
+  function collapse(list) {
+    const byCat = {};
+    for (const m of list) {
+      let cat = 'other';
+      for (const [c, rids] of Object.entries(categories)) {
+        if (rids.some(r => ruleIds.includes(r) && m.includes(r.split('-')[1] || ''))) { cat = c; break; }
+      }
+      byCat[cat] = byCat[cat] || [];
+      byCat[cat].push(m);
+    }
+    const out = [];
+    for (const [cat, msgs] of Object.entries(byCat)) {
+      if (msgs.length === 1) out.push(msgs[0]);
+      else out.push(`${msgs[0]} (+${msgs.length - 1} more ${cat} issue${msgs.length - 1 > 1 ? 's' : ''})`);
+    }
+    return out;
+  }
+
+  const dedupErrors = dedup(finalErrors);
+  const dedupWarnings = dedup(finalWarnings);
+  const collapsedErrors = collapse(dedupErrors);
+  const collapsedWarnings = collapse(dedupWarnings);
+  const distinctRuleIds = dedup(ruleIds.filter(r => severityOverrides[r] !== 'off'));
+  return { ok: collapsedErrors.length === 0, errors: collapsedErrors, warnings: collapsedWarnings, ruleIds: distinctRuleIds };
 }
 
 /**

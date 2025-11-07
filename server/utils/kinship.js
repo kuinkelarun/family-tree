@@ -71,6 +71,22 @@ export function buildAdjacency(members, options = {}) {
     }
   }
 
+  // Derive siblings from shared parents and merge with explicit siblings.
+  // This makes collateral detection via sibling-of-ancestor more robust even when explicit sibling edges are missing.
+  const derivedSiblingsOf = new Map(Array.from(parentsOf.keys()).map((k) => [k, new Set()]));
+  for (const [child, ps] of parentsOf.entries()) {
+    for (const p of ps) {
+      for (const sib of childrenOf.get(p) || []) {
+        if (sib !== child) derivedSiblingsOf.get(child).add(sib);
+      }
+    }
+  }
+  for (const id of siblingsOf.keys()) {
+    const merged = siblingsOf.get(id) || new Set();
+    for (const x of (derivedSiblingsOf.get(id) || new Set())) merged.add(x);
+    siblingsOf.set(id, merged);
+  }
+
   return { parentsOf, childrenOf, spousesOf, siblingsOf };
 }
 
@@ -153,6 +169,22 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
     return { label, class: 'lineal', meta: { role: 'descendant', steps: d, relationCode: { type: 'descendant', level: d } } };
   }
 
+  // Early MRCA-based aunt/uncle vs niece/nephew classification to avoid mislabeling as cousins
+  const mrcaEarly = findMRCA(a, b, parentsOf, depthLimit);
+  if (mrcaEarly) {
+    const { k, l, id: mrcaId } = mrcaEarly;
+    const minKL = Math.min(k, l);
+    const maxKL = Math.max(k, l);
+    if (minKL === 1 && maxKL >= 2) {
+      const isAuntUncle = k === 1; // A one step from MRCA → A is aunt/uncle of B; otherwise niece/nephew
+      const greats = maxKL - 2;
+      const base = isAuntUncle ? 'aunt/uncle' : 'niece/nephew';
+      const label = greats > 0 ? `${'great-'.repeat(greats)}${base}` : base;
+      const level = maxKL - 1; // 1=aunt/uncle or niece/nephew; 2=grand-...; >=3=great-...grand-...
+      return { label, class: 'collateral', meta: { mrcaId, k, l, kind: isAuntUncle ? 'aunt-uncle' : 'niece-nephew', greats, relationCode: { type: isAuntUncle ? 'aunt_uncle' : 'niece_nephew', level } } };
+    }
+  }
+
   // Siblings / half-siblings
   const pA = parentsOf.get(a) || new Set();
   const pB = parentsOf.get(b) || new Set();
@@ -227,7 +259,7 @@ export function classifyConsanguine(A, B, graphs, options = {}) {
   }
 
   // MRCA for collateral relations (aunt/uncle/niece/nephew/cousins)
-  const mrca = findMRCA(a, b, parentsOf, depthLimit);
+  const mrca = mrcaEarly || findMRCA(a, b, parentsOf, depthLimit);
   if (!mrca) {
     return { label: 'unrelated (by blood)', class: 'none', meta: { relationCode: { type: 'unrelated' } } };
   }

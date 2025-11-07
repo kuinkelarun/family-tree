@@ -7,8 +7,9 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "smoke:validation": "node ./scripts/validationRulesSmoke.js",
-    "smoke:kinship": "node ./scripts/kinshipCoSpouseSmoke.js"
+  "smoke:validation": "node ./scripts/validationRulesSmoke.js",
+  "smoke:kinship": "node ./scripts/kinshipCoSpouseSmoke.js",
+  "smoke:severity": "node ./scripts/severityOverrideSmoke.js"
   },
   "dependencies": {
     "winston": "^3.9.0",

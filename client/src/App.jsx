@@ -6,7 +6,7 @@ import TreeBoard from './components/TreeBoard.jsx';
 import MemberModal from './components/MemberModal.jsx';
 import RelationshipPicker from './components/RelationshipPicker.jsx';
 import EdgeEditorPopover from './components/EdgeEditorPopover.jsx';
-import AdminRecomputeJobs from './components/AdminRecomputeJobs.jsx';
+import AdminPanel from './components/AdminPanel.jsx';
 import KinshipPanel from './components/KinshipPanel.jsx';
 import { api, Auth, Trees, Members, Relationships, Users, getToken, setToken, getTreeId, setTreeId } from './utils/api.js';
 import { displayMemberName } from './utils/format.js';
@@ -1282,8 +1282,8 @@ function App() {
           return;
         }
 
-        const ops = [];
-        const validationFailures = [];
+  const ops = [];
+  const validationFailures = [];
         for (const parentId of parents) {
           // skip self-connections
           if (String(parentId) === tgt) continue;
@@ -1297,7 +1297,7 @@ function App() {
           try {
             const v = await Relationships.validate({ fromMemberId: parentId, toMemberId: tgt, type: 'child' });
             if (!v.ok) {
-              validationFailures.push({ parentId, errors: v.errors });
+              validationFailures.push({ parentId, errors: v.errors || [], ruleIds: v.ruleIds || [] });
               continue;
             }
             if (v.warnings && v.warnings.length) {
@@ -1306,13 +1306,51 @@ function App() {
             // mark as authored so layout/visualization preserves the direction as entered by the user
             ops.push(Relationships.create({ fromMemberId: parentId, toMemberId: tgt, type: 'child', label: 'child', authored: true }));
           } catch (ve) {
-            validationFailures.push({ parentId, errors: [ve.message] });
+            validationFailures.push({ parentId, errors: [ve.message], ruleIds: [] });
           }
         }
 
         if (!ops.length) {
           if (validationFailures.length) {
-            const msg = validationFailures.map(f => `Parent ${f.parentId}: ${f.errors.join('; ')}`).join(' | ');
+            // Attempt an ultra-compact, human-friendly summary
+            const membersById = new Map((members || []).map(m => [String(m._id), m]));
+            const childName = membersById.get(String(tgt))?.name || String(tgt);
+
+            // If all failures contain the specific topology rule 'no-grandchild-as-child', aggregate into one sentence
+            const failuresWithRule = validationFailures.filter(f => (f.ruleIds || []).includes('no-grandchild-as-child'));
+            if (failuresWithRule.length === validationFailures.length && failuresWithRule.length > 0) {
+              const parentNames = failuresWithRule.map(f => membersById.get(String(f.parentId))?.name || String(f.parentId));
+              const uniqueParents = Array.from(new Set(parentNames));
+              const parentsStr = uniqueParents.length === 1 ? uniqueParents[0] : uniqueParents.join(' and ');
+              showToast(`Cannot add child relationship(s): ${childName} is already a grandchild of ${parentsStr} via existing connections.`);
+              return;
+            }
+
+            // Fallback: collapse repetitive affinal messages and show parent names instead of IDs
+            const collapse = (errs) => {
+              const seen = new Set();
+              const out = [];
+              for (const e of errs) {
+                const key = /spouse of .* \(an ancestor/.test(e) ? 'AFFINAL_ANCESTOR' : e;
+                if (key === 'AFFINAL_ANCESTOR') {
+                  if (!seen.has(key)) { out.push('Blocked due to ancestor hierarchy (affinal relationship).'); seen.add(key); }
+                } else {
+                  // Trim verbose prefixes like "Cannot set X as child of Y: "
+                  const m = e.match(/^Cannot set .*? as child of .*?:\s*(.*)$/i);
+                  out.push(m ? m[1] : e);
+                }
+              }
+              return out;
+            };
+            const msg = validationFailures.map(f => {
+              const parentName = membersById.get(String(f.parentId))?.name || String(f.parentId);
+              const collapsed = collapse(f.errors || []);
+              // Show only first error and summarize remainder
+              if (collapsed.length > 1) {
+                return `${parentName}: ${collapsed[0]} (+${collapsed.length - 1} more)`;
+              }
+              return `${parentName}: ${collapsed[0] || 'Blocked'}`;
+            }).join(' | ');
             showToast(`Cannot add child relationship(s): ${msg}`);
           } else {
             showToast('No new child relationships to add');
@@ -2055,7 +2093,7 @@ function App() {
           </div>
         )}
         {showAdminPanel && (
-          <AdminRecomputeJobs onClose={() => { window.location.hash = ''; setShowAdminPanel(false); }} />
+          <AdminPanel onClose={() => { window.location.hash = ''; setShowAdminPanel(false); }} />
         )}
         {showKinship && (
           <KinshipPanel
