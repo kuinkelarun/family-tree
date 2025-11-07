@@ -5,6 +5,7 @@ import { relationshipSchema, relationshipUpdateSchema, relationshipDeleteSchema 
 import { recomputeGenerationsForTree } from '../utils/generation.js';
 import { enqueueRecompute } from '../utils/recomputeQueue.js';
 import { runAtomic } from '../utils/dbTransactions.js';
+import { loadTreeGraph, validateProposedRelationship } from '../utils/relationshipRules.js';
 
 export async function addRelationship(req, res) {
   const parsed = relationshipSchema.safeParse(req.body);
@@ -21,6 +22,13 @@ export async function addRelationship(req, res) {
       const tree = session ? await FamilyTree.findById(from.tree).session(session) : await FamilyTree.findById(from.tree);
       if (!(tree.owner.equals(req.user.id) || tree.permissions.some((p) => p.user.equals(req.user.id) && p.access !== 'viewer')))
         throw new Error('Forbidden');
+
+      // Load graph once for semantic validation
+      const graph = await loadTreeGraph(from.tree);
+      const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create' });
+      if (!v.ok) {
+        return { ok: false, error: 'Validation failed', errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds };
+      }
 
       // Add directionally and ensure reciprocal where appropriate
       if (!Array.isArray(from.relationships)) from.relationships = [];
@@ -49,7 +57,8 @@ export async function addRelationship(req, res) {
 
       return { ok: true };
     });
-    return res.status(201).json(result);
+    if (result?.ok) return res.status(201).json(result);
+    return res.status(400).json(result);
   } catch (e) {
     if (e.message === 'Member not found') return res.status(404).json({ error: 'Member not found' });
     if (e.message === 'Members must belong to same tree') return res.status(400).json({ error: 'Members must belong to same tree' });
@@ -84,8 +93,15 @@ export async function updateRelationship(req, res) {
       const idx = (from.relationships || []).findIndex((r) => String(r.relative) === String(to._id) && r.type === type);
       if (idx === -1) throw new Error('Relationship not found');
 
-      // update from side
+      // Validate the proposed new type before applying
+      const graph = await loadTreeGraph(from.tree);
       const nextType = newType || type;
+      const v = validateProposedRelationship(graph, String(from._id), String(to._id), nextType, { mode: 'update', previousType: type });
+      if (!v.ok) {
+        return { ok: false, error: 'Validation failed', errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds };
+      }
+
+      // update from side
   from.relationships[idx].type = nextType;
   // Preserve authored flag on original side; if user changes type it remains authored
   if (typeof from.relationships[idx].authored !== 'boolean') from.relationships[idx].authored = true;
@@ -122,12 +138,33 @@ export async function updateRelationship(req, res) {
 
       return { ok: true };
     });
-    return res.json(result);
+    if (result?.ok) return res.json(result);
+    return res.status(400).json(result);
   } catch (e) {
     if (e.message === 'Member not found') return res.status(404).json({ error: 'Member not found' });
     if (e.message === 'Members must belong to same tree') return res.status(400).json({ error: 'Members must belong to same tree' });
     if (e.message === 'Forbidden') return res.status(403).json({ error: 'Forbidden' });
     if (e.message === 'Relationship not found') return res.status(404).json({ error: 'Relationship not found' });
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+export async function validateRelationship(req, res) {
+  const parsed = relationshipSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { fromMemberId, toMemberId, type } = parsed.data;
+  try {
+    const from = await Member.findById(fromMemberId);
+    const to = await Member.findById(toMemberId);
+    if (!from || !to) return res.status(404).json({ error: 'Member not found' });
+    if (!from.tree.equals(to.tree)) return res.status(400).json({ error: 'Members must belong to same tree' });
+    const tree = await FamilyTree.findById(from.tree);
+    if (!(tree.owner.equals(req.user.id) || tree.permissions.some((p) => p.user.equals(req.user.id) && p.access !== 'viewer')))
+      return res.status(403).json({ error: 'Forbidden' });
+    const graph = await loadTreeGraph(from.tree);
+    const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create' });
+    return res.json({ ok: v.ok, errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds });
+  } catch (e) {
     return res.status(500).json({ error: e.message });
   }
 }

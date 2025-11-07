@@ -1283,6 +1283,7 @@ function App() {
         }
 
         const ops = [];
+        const validationFailures = [];
         for (const parentId of parents) {
           // skip self-connections
           if (String(parentId) === tgt) continue;
@@ -1292,12 +1293,27 @@ function App() {
           const already = (parentMember?.relationships || []).some(r => String((r.relative && r.relative._id) || r.relative) === String(tgt) && r.type === 'child');
           if (already) continue;
 
-          // mark as authored so layout/visualization preserves the direction as entered by the user
-          ops.push(Relationships.create({ fromMemberId: parentId, toMemberId: tgt, type: 'child', label: 'child', authored: true }));
+          // validate on server before queuing
+          try {
+            const v = await Relationships.validate({ fromMemberId: parentId, toMemberId: tgt, type: 'child' });
+            if (!v.ok) {
+              validationFailures.push({ parentId, errors: v.errors });
+              continue;
+            }
+            // mark as authored so layout/visualization preserves the direction as entered by the user
+            ops.push(Relationships.create({ fromMemberId: parentId, toMemberId: tgt, type: 'child', label: 'child', authored: true }));
+          } catch (ve) {
+            validationFailures.push({ parentId, errors: [ve.message] });
+          }
         }
 
         if (!ops.length) {
-          showToast('No new child relationships to add');
+          if (validationFailures.length) {
+            const msg = validationFailures.map(f => `Parent ${f.parentId}: ${f.errors.join('; ')}`).join(' | ');
+            showToast(`Cannot add child relationship(s): ${msg}`);
+          } else {
+            showToast('No new child relationships to add');
+          }
           return;
         }
 
@@ -1321,6 +1337,12 @@ function App() {
   async function confirmRelationship(type, label) {
     try {
       console.log(`[confirmRelationship] Creating: ${relPicker.source} -> ${relPicker.target}, type=${type}, label=${label}`);
+      // Pre-validate
+      const v = await Relationships.validate({ fromMemberId: relPicker.source, toMemberId: relPicker.target, type });
+      if (!v.ok) {
+        showToast(`Validation failed: ${v.errors.join('; ')}`);
+        return;
+      }
       // Remove any preview once we commit (we'll show the real edge after reload)
       // Keeping the preview until after loadTree would avoid any single-frame overlap, but both are acceptable.
   // Mark user-created relationship as authored so the visual direction remains as the user specified

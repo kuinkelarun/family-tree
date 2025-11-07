@@ -76,6 +76,7 @@ export const Members = {
 };
 
 export const Relationships = {
+  async validate(payload) { return api('/api/relationships/validate', { method: 'POST', body: payload }); },
   async create(payload) { return api('/api/relationships', { method: 'POST', body: payload }); },
   async update(payload) { return api('/api/relationships', { method: 'PUT', body: payload }); },
   async remove(payload) {

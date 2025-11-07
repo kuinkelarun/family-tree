@@ -26,6 +26,10 @@ See `.env.example` for all variables. Minimal:
 - Relationship types validated server‑side; client shows warnings for conflicts.
 - AI routes gracefully degrade when `OPENAI_API_KEY` is missing.
 
+## Relationship validation
+
+The API enforces relationship integrity (e.g., prevents parent/child between siblings, spouse between ancestor/descendant, and duplicate edges). A validation-only endpoint is available at `POST /api/relationships/validate` for client prechecks. See `VALIDATION-RULES.md` for details and how to extend rules.
+
 ## Setup Instructions
 
 ### 1. Clone the repository
