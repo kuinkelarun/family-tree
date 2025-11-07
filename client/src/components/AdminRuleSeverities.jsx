@@ -9,6 +9,7 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState({});
+  const [originalSeverities, setOriginalSeverities] = useState({});
   const [rules, setRules] = useState([]); // [{id, description, defaultSeverity}]
   const [hoveredRow, setHoveredRow] = useState(null);
 
@@ -36,7 +37,11 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
     setLoading(true); setError('');
     try {
       const data = await Admin.getSeverities(treeId);
-      setSeverities(data.severities || {});
+      const sev = data.severities || {};
+      setSeverities(sev);
+      setOriginalSeverities(sev);
+      // clear unsaved flag after load
+      window.__admin_hasUnsaved = false;
     } catch (e) { setError(e.message || String(e)); }
     finally { setLoading(false); }
   }
@@ -51,6 +56,8 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
     } else {
       setSeverities(s => ({ ...s, [ruleId]: severity }));
     }
+    // mark unsaved; actual precise comparison will run in effect below
+    window.__admin_hasUnsaved = true;
   }
 
   async function handleSave() {
@@ -59,9 +66,25 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
       // Only send changed severities (for now send all)
       await Admin.patchSeverities(treeId, severities);
       await load();
+      // after successful save/reset, clear unsaved flag
+      window.__admin_hasUnsaved = false;
     } catch (e) { setError(e.message || String(e)); }
     finally { setSaving(false); }
   }
+
+  // Keep a running detection of unsaved changes (compare shallow keys/values)
+  useEffect(() => {
+    try {
+      const a = originalSeverities || {};
+      const b = severities || {};
+      const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+      let same = true;
+      for (const k of keys) {
+        if ((a[k] || null) !== (b[k] || null)) { same = false; break; }
+      }
+      window.__admin_hasUnsaved = !same;
+    } catch (e) { window.__admin_hasUnsaved = true; }
+  }, [originalSeverities, severities]);
 
   async function handleDelete(ruleId) {
     if (!confirm(`Remove custom severity for '${ruleId}'? This reverts to default.`)) return;

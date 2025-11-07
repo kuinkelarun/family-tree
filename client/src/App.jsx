@@ -31,7 +31,7 @@ function App() {
   const [password, setPassword] = useState('');
   const [token, setTokenState] = useState(getToken() || '');
   const [currentUser, setCurrentUser] = useState(null);
-  const [showAdminPanel, setShowAdminPanel] = useState(window.location.hash === '#/admin');
+  const [showAdminPanel, setShowAdminPanel] = useState(window.location.pathname === '/admin');
   const [treeId, setTreeIdState] = useState(getTreeId());
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -1551,17 +1551,41 @@ function App() {
 
   // (Removed) temporary node highlight feature
 
-  // Expose a small hash-based router for the admin page so the admin UI is reachable at #/admin
+  // Expose a small router hook for the admin page so other scripts can update the app state
   useEffect(() => {
+    // expose setter for legacy code but keep a local popstate handler below
     window.__app_setShowAdmin = setShowAdminPanel;
-    const onHash = () => setShowAdminPanel(window.location.hash === '#/admin');
-    window.addEventListener('hashchange', onHash);
-    // initialize from current hash
-    onHash();
+    // initialize from current pathname
+    setShowAdminPanel(window.location.pathname === '/admin');
     return () => {
-      window.removeEventListener('hashchange', onHash);
       try { delete window.__app_setShowAdmin; } catch (e) {}
     };
+  }, []);
+
+  // Use a React effect to handle browser navigation (back/forward)
+  useEffect(() => {
+    const onPop = (ev) => {
+      try {
+        const isAdmin = window.location.pathname === '/admin';
+        if (!isAdmin && window.__admin_hasUnsaved) {
+          const ok = window.confirm('You have unsaved admin changes. Leave without saving?');
+          if (!ok) {
+            // user cancelled navigation — push back to /admin
+            history.pushState(null, '', '/admin');
+            setShowAdminPanel(true);
+            return;
+          }
+          // otherwise clear the flag and continue
+          window.__admin_hasUnsaved = false;
+        }
+        setShowAdminPanel(isAdmin);
+      } catch (e) {
+        // best-effort: ensure admin panel visibility matches pathname
+        setShowAdminPanel(window.location.pathname === '/admin');
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   }, []);
 
   // Toasts
@@ -1952,7 +1976,7 @@ function App() {
         onDeleteMember={canEdit ? handleDeleteMember : undefined}
         onAddNewMember={openNewMemberModal}
         currentUser={currentUser}
-        onOpenAdmin={() => { window.location.hash = '#/admin'; }}
+  onOpenAdmin={() => { window.history.pushState(null, '', '/admin'); setShowAdminPanel(true); }}
         canAddMember={!!(isAuthed && treeId && canEdit)}
         showToast={showToast}
         onCollapse={() => setSidebarCollapsed(true)}
@@ -2093,7 +2117,7 @@ function App() {
           </div>
         )}
         {showAdminPanel && (
-          <AdminPanel onClose={() => { window.location.hash = ''; setShowAdminPanel(false); }} />
+          <AdminPanel onClose={() => { window.history.back(); }} page />
         )}
         {showKinship && (
           <KinshipPanel
@@ -2104,14 +2128,7 @@ function App() {
             canQuery={!!(token && treeId)}
           />
         )}
-        {/* Keep showAdminPanel in sync with URL hash so admin page is a route */}
-        <script dangerouslySetInnerHTML={{ __html: `
-          (function(){
-            window.addEventListener('hashchange', function(){
-              try{ if(window.location.hash === '#/admin') { window.__app_setShowAdmin && window.__app_setShowAdmin(true); } else { window.__app_setShowAdmin && window.__app_setShowAdmin(false); }}catch(e){}
-            });
-          })();
-        ` }} />
+        {/* popstate is handled in a React effect to keep navigation and prompts inside React */}
         
       </main>
     </div>
