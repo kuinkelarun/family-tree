@@ -106,4 +106,21 @@ export const Admin = {
   async getSeverities(treeId) { return api(`/api/admin/trees/${encodeURIComponent(treeId)}/severities`); },
   async patchSeverities(treeId, updates) { return api(`/api/admin/trees/${encodeURIComponent(treeId)}/severities`, { method: 'PATCH', body: { updates } }); },
   async deleteSeverity(treeId, ruleId) { return api(`/api/admin/trees/${encodeURIComponent(treeId)}/severities/${encodeURIComponent(ruleId)}`, { method: 'DELETE' }); },
+  // Admin trees management
+  async listTrees({ limit, offset, sort, dir, search, showDeleted } = {}) {
+    const qs = [];
+    if (limit) qs.push(`limit=${encodeURIComponent(limit)}`);
+    if (offset) qs.push(`offset=${encodeURIComponent(offset)}`);
+    if (sort) qs.push(`sort=${encodeURIComponent(sort)}`);
+    if (dir) qs.push(`dir=${encodeURIComponent(dir)}`);
+    if (search) qs.push(`search=${encodeURIComponent(search)}`);
+    if (showDeleted) qs.push(`showDeleted=true`);
+    const q = qs.length ? `?${qs.join('&')}` : '';
+    return api(`/api/admin/trees${q}`);
+  },
+  async getTree(id) { return api(`/api/admin/trees/${encodeURIComponent(id)}`); },
+  async archiveTree(id, archive = true) { return api(`/api/admin/trees/${encodeURIComponent(id)}/archive`, { method: 'POST', body: { archive } }); },
+  async transferTree(id, newOwnerId) { return api(`/api/admin/trees/${encodeURIComponent(id)}/transfer`, { method: 'POST', body: { newOwnerId } }); },
+  async deleteTree(id, hard = false) { const q = hard ? '?hard=true' : ''; return api(`/api/admin/trees/${encodeURIComponent(id)}${q}`, { method: 'DELETE' }); },
+  async bulkTrees(action, ids = []) { return api('/api/admin/trees/bulk', { method: 'POST', body: { action, ids } }); },
 };

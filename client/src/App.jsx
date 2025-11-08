@@ -32,6 +32,7 @@ function App() {
   const [token, setTokenState] = useState(getToken() || '');
   const [currentUser, setCurrentUser] = useState(null);
   const [showAdminPanel, setShowAdminPanel] = useState(window.location.pathname === '/admin');
+  const [adminUnsaved, setAdminUnsaved] = useState(false);
   const [treeId, setTreeIdState] = useState(getTreeId());
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -1555,8 +1556,8 @@ function App() {
   useEffect(() => {
     // expose setter for legacy code but keep a local popstate handler below
     window.__app_setShowAdmin = setShowAdminPanel;
-    // initialize from current pathname
-    setShowAdminPanel(window.location.pathname === '/admin');
+    // initialize from current pathname (any /admin/* route should open admin)
+    setShowAdminPanel(window.location.pathname.startsWith('/admin'));
     return () => {
       try { delete window.__app_setShowAdmin; } catch (e) {}
     };
@@ -1566,8 +1567,8 @@ function App() {
   useEffect(() => {
     const onPop = (ev) => {
       try {
-        const isAdmin = window.location.pathname === '/admin';
-        if (!isAdmin && window.__admin_hasUnsaved) {
+        const isAdmin = window.location.pathname.startsWith('/admin');
+        if (!isAdmin && adminUnsaved) {
           const ok = window.confirm('You have unsaved admin changes. Leave without saving?');
           if (!ok) {
             // user cancelled navigation — push back to /admin
@@ -1576,7 +1577,7 @@ function App() {
             return;
           }
           // otherwise clear the flag and continue
-          window.__admin_hasUnsaved = false;
+          setAdminUnsaved(false);
         }
         setShowAdminPanel(isAdmin);
       } catch (e) {
@@ -1586,7 +1587,7 @@ function App() {
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, []);
+  }, [adminUnsaved]);
 
   // Toasts
   const [toast, setToast] = useState('');
@@ -1976,7 +1977,7 @@ function App() {
         onDeleteMember={canEdit ? handleDeleteMember : undefined}
         onAddNewMember={openNewMemberModal}
         currentUser={currentUser}
-  onOpenAdmin={() => { window.history.pushState(null, '', '/admin'); setShowAdminPanel(true); }}
+  onOpenAdmin={() => { window.history.pushState(null, '', '/admin/trees'); setShowAdminPanel(true); }}
         canAddMember={!!(isAuthed && treeId && canEdit)}
         showToast={showToast}
         onCollapse={() => setSidebarCollapsed(true)}
@@ -2117,7 +2118,7 @@ function App() {
           </div>
         )}
         {showAdminPanel && (
-          <AdminPanel onClose={() => { window.history.back(); }} page />
+          <AdminPanel onClose={() => { window.history.back(); }} page adminUnsaved={adminUnsaved} setAdminUnsaved={setAdminUnsaved} />
         )}
         {showKinship && (
           <KinshipPanel

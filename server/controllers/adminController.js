@@ -1,6 +1,9 @@
 import { listQueuedJobs, forceRetry, removeJob } from '../utils/recomputeQueue.js';
 import RecomputeJob from '../models/RecomputeJob.js';
 import FamilyTree from '../models/FamilyTree.js';
+import mongoose from 'mongoose';
+import AdminAudit from '../models/AdminAudit.js';
+import User from '../models/User.js';
 import { validationRuleMetadata } from '../utils/relationshipRules.js';
 
 const VALID_SEVERITIES = ['error','warn','off'];
@@ -113,6 +116,214 @@ export async function getValidationRulesMetadata(req, res) {
   try {
     // No DB needed; served from code metadata to keep server authoritative
     res.json({ ok: true, rules: validationRuleMetadata });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+// --- Admin Trees listing and management ---
+export async function listTrees(req, res) {
+  try {
+    // Only admins allowed (router should enforce requireAdmin)
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '25', 10)));
+    const offset = Math.max(0, parseInt(req.query.offset || req.query.page || '0', 10));
+    const sortField = req.query.sort || 'updatedAt';
+    const dir = req.query.dir === 'asc' ? 1 : -1;
+    const search = (req.query.search || '').trim();
+    // Build an aggregation pipeline that looks up owner email and matches title OR owner.email
+    // This uses a single DB roundtrip and allows exact-email matching when the search looks like an email.
+    function escapeRegExp(str) {
+      return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    const pipeline = [];
+    // Exclude soft-deleted trees by default
+    if (!req.query.showDeleted) pipeline.push({ $match: { deletedAt: { $exists: false } } });
+
+    // If the caller is not an admin, restrict results to trees the user owns or has permissions on
+    const userPayload = req.user || {};
+    const roles = Array.isArray(userPayload.roles) ? userPayload.roles.map(r => String(r).toLowerCase()) : [];
+    const envAdmins = (process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim()).filter(Boolean);
+    const isAdmin = roles.includes('admin') || (userPayload.email && envAdmins.includes(userPayload.email));
+    if (!isAdmin) {
+      try {
+        const uid = mongoose.Types.ObjectId(userPayload.id);
+        pipeline.push({ $match: { $or: [ { owner: uid }, { 'permissions.user': uid } ] } });
+      } catch (e) {
+        // if the user id is not a valid ObjectId for some reason, deny by returning empty
+        return res.json({ ok: true, items: [], total: 0, limit, offset });
+      }
+    }
+
+    // Lookup owner document to expose owner email for matching and projection
+    pipeline.push({
+      $lookup: {
+        from: User.collection.name,
+        localField: 'owner',
+        foreignField: '_id',
+        as: 'ownerDoc',
+      }
+    });
+    // Simplify owner email into a top-level field for easier matching
+    pipeline.push({ $addFields: { ownerEmail: { $arrayElemAt: ['$ownerDoc.email', 0] } } });
+
+    if (search) {
+      if (search.includes('@')) {
+        // Prefer exact email matches when the query looks like an email (case-insensitive)
+        const esc = escapeRegExp(search);
+        pipeline.push({ $match: {
+          $or: [
+            { title: { $regex: search, $options: 'i' } },
+            { ownerEmail: { $regex: `^${esc}$`, $options: 'i' } }
+          ]
+        } });
+      } else {
+        // General substring match on title or ownerEmail
+        pipeline.push({ $match: {
+          $or: [
+            { title: { $regex: search, $options: 'i' } },
+            { ownerEmail: { $regex: search, $options: 'i' } }
+          ]
+        } });
+      }
+    }
+
+    // Facet to get total and paginated items in a single aggregation
+    pipeline.push({
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        items: [
+          { $sort: { [sortField]: dir } },
+          { $skip: offset },
+          { $limit: limit },
+          { $project: { title: 1, owner: 1, ownerEmail: 1, createdAt: 1, updatedAt: 1, members: 1, deletedAt: 1 } }
+        ]
+      }
+    });
+
+    const aggRes = await FamilyTree.aggregate(pipeline).exec();
+    const meta = Array.isArray(aggRes) && aggRes[0] && Array.isArray(aggRes[0].metadata) ? aggRes[0].metadata : [];
+    const items = Array.isArray(aggRes) && aggRes[0] && Array.isArray(aggRes[0].items) ? aggRes[0].items : [];
+    const total = (meta[0] && meta[0].total) ? meta[0].total : 0;
+
+    // Map to UI-friendly shape
+    const mapped = items.map(t => ({
+      id: t._id,
+      title: t.title,
+      ownerId: t.owner || null,
+      ownerEmail: t.ownerEmail || null,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+      deletedAt: t.deletedAt || null,
+      nodeCount: Array.isArray(t.members) ? t.members.length : 0,
+    }));
+
+    res.json({ ok: true, items: mapped, total, limit, offset });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function getTreeDetails(req, res) {
+  try {
+    const { id } = req.params;
+    const tree = await FamilyTree.findById(id).populate('owner', 'email displayName').lean();
+    if (!tree) return res.status(404).json({ error: 'Tree not found' });
+    // If the caller is not an admin, ensure they are owner or in permissions
+    const userPayload = req.user || {};
+    const roles = Array.isArray(userPayload.roles) ? userPayload.roles.map(r => String(r).toLowerCase()) : [];
+    const envAdmins = (process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim()).filter(Boolean);
+    const isAdmin = roles.includes('admin') || (userPayload.email && envAdmins.includes(userPayload.email));
+    if (!isAdmin) {
+      const uid = String(userPayload.id);
+      const ownerId = String(tree.owner?._id || tree.owner);
+      const hasPerm = Array.isArray(tree.permissions) && tree.permissions.some(p => String(p.user) === uid);
+      if (ownerId !== uid && !hasPerm) return res.status(403).json({ error: 'Forbidden' });
+    }
+    res.json({ ok: true, tree });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function postArchiveTree(req, res) {
+  try {
+    const { id } = req.params;
+    const { archive } = req.body || {};
+    const tree = await FamilyTree.findById(id);
+    if (!tree) return res.status(404).json({ error: 'Tree not found' });
+    tree.deletedAt = archive ? new Date() : undefined;
+    await tree.save();
+    await AdminAudit.create({ actor: req.user.id, action: 'archive-tree', treeId: tree._id, details: { archive: !!archive } });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function postTransferTree(req, res) {
+  try {
+    const { id } = req.params;
+    const { newOwnerId } = req.body || {};
+    if (!newOwnerId) return res.status(400).json({ error: 'newOwnerId required' });
+    const tree = await FamilyTree.findById(id);
+    if (!tree) return res.status(404).json({ error: 'Tree not found' });
+    const prev = tree.owner;
+    tree.owner = newOwnerId;
+    await tree.save();
+    await AdminAudit.create({ actor: req.user.id, action: 'transfer-tree', treeId: tree._id, details: { from: prev, to: newOwnerId } });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function deleteTree(req, res) {
+  try {
+    const { id } = req.params;
+    const hard = !!req.query.hard;
+    const tree = await FamilyTree.findById(id);
+    if (!tree) return res.status(404).json({ error: 'Tree not found' });
+    if (hard) {
+      await FamilyTree.deleteOne({ _id: id });
+      await AdminAudit.create({ actor: req.user.id, action: 'delete-tree-hard', treeId: id, details: {} });
+      return res.json({ ok: true, deleted: true });
+    }
+    tree.deletedAt = new Date();
+    await tree.save();
+    await AdminAudit.create({ actor: req.user.id, action: 'delete-tree-soft', treeId: id, details: {} });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function bulkTreesAction(req, res) {
+  try {
+    const { action, ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+    if (!['archive', 'delete', 'export'].includes(action)) return res.status(400).json({ error: 'invalid action' });
+    const results = [];
+    for (const id of ids) {
+      try {
+        if (action === 'archive') {
+          const t = await FamilyTree.findById(id);
+          if (t) { t.deletedAt = new Date(); await t.save(); }
+          await AdminAudit.create({ actor: req.user.id, action: 'archive-tree-bulk', treeId: id, details: {} });
+          results.push({ id, ok: true });
+        } else if (action === 'delete') {
+          await FamilyTree.deleteOne({ _id: id });
+          await AdminAudit.create({ actor: req.user.id, action: 'delete-tree-hard-bulk', treeId: id, details: {} });
+          results.push({ id, ok: true });
+        } else if (action === 'export') {
+          // export placeholder — real export handled elsewhere
+          results.push({ id, ok: true, exported: true });
+        }
+      } catch (ee) {
+        results.push({ id, ok: false, error: ee.message });
+      }
+    }
+    res.json({ ok: true, results });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

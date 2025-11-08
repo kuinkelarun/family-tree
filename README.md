@@ -105,5 +105,23 @@ VITE_API_BASE_URL=http://localhost:4000
 
 ---
 
+## SPA route fallback (production)
+
+This client app uses the browser History API for route-like behavior (for example the Admin page at `/admin`). In development Vite serves the SPA and responds to direct route loads; in production you must configure your static server to return `index.html` for unknown paths so direct visits to `/admin` (or other client routes) load the SPA entry point. Examples:
+
+- Express (Node):
+```js
+app.use(express.static(path.join(__dirname, 'dist')));
+app.get('/*', (_, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
+```
+- Netlify: add a `_redirects` file with:
+```
+/*    /index.html   200
+```
+- Vercel: use a rewrite rule to serve `index.html` for client routes or rely on default SPA behavior.
+
+Without this fallback, directly loading `/admin` from the browser will produce a 404 from the static host instead of the app.
+
+
 If you encounter any errors, copy the error message and ask for help.
 

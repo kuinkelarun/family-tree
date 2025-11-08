@@ -14,7 +14,8 @@ export function requireAuth(req, res, next) {
 }
 
 export function signToken(user) {
-  const payload = { id: user._id, email: user.email };
+  // Include roles in the token so role-based checks (e.g. requireAdmin) work
+  const payload = { id: user._id, email: user.email, roles: Array.isArray(user.roles) ? user.roles : [] };
   const secret = process.env.JWT_SECRET || 'dev-secret';
   return jwt.sign(payload, secret, { expiresIn: '7d' });
 }

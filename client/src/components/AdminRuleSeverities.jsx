@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Admin, Trees, getTreeId } from '../utils/api.js';
 
 // Simple inline list of rule severities with edit controls.
-export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embedded = false }) {
+export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embedded = false, adminUnsaved, setAdminUnsaved }) {
   const [treeId, setTreeId] = useState(propTreeId || getTreeId());
   const [severities, setSeverities] = useState({});
   const [loading, setLoading] = useState(false);
@@ -41,7 +41,7 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
       setSeverities(sev);
       setOriginalSeverities(sev);
       // clear unsaved flag after load
-      window.__admin_hasUnsaved = false;
+      if (typeof setAdminUnsaved === 'function') setAdminUnsaved(false);
     } catch (e) { setError(e.message || String(e)); }
     finally { setLoading(false); }
   }
@@ -57,7 +57,7 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
       setSeverities(s => ({ ...s, [ruleId]: severity }));
     }
     // mark unsaved; actual precise comparison will run in effect below
-    window.__admin_hasUnsaved = true;
+    if (typeof setAdminUnsaved === 'function') setAdminUnsaved(true);
   }
 
   async function handleSave() {
@@ -67,7 +67,7 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
       await Admin.patchSeverities(treeId, severities);
       await load();
       // after successful save/reset, clear unsaved flag
-      window.__admin_hasUnsaved = false;
+      if (typeof setAdminUnsaved === 'function') setAdminUnsaved(false);
     } catch (e) { setError(e.message || String(e)); }
     finally { setSaving(false); }
   }
@@ -82,8 +82,8 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
       for (const k of keys) {
         if ((a[k] || null) !== (b[k] || null)) { same = false; break; }
       }
-      window.__admin_hasUnsaved = !same;
-    } catch (e) { window.__admin_hasUnsaved = true; }
+      if (typeof setAdminUnsaved === 'function') setAdminUnsaved(!same);
+    } catch (e) { if (typeof setAdminUnsaved === 'function') setAdminUnsaved(true); }
   }, [originalSeverities, severities]);
 
   async function handleDelete(ruleId) {
