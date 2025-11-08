@@ -1939,7 +1939,7 @@ function App() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, system-ui, Avenir, Helvetica, Arial, sans-serif', background: '#f8fafc' }}>
-      {sidebarCollapsed && (
+  {!showAdminPanel && sidebarCollapsed && (
         <div
           onClick={() => setSidebarCollapsed(false)}
           onMouseEnter={() => setSlotHover(true)}
@@ -1967,7 +1967,7 @@ function App() {
           <ChevronRightIcon style={{ width: 16, height: 16, color: '#475569', opacity: slotHover ? 0.85 : 0.6 }} />
         </div>
       )}
-      {!sidebarCollapsed && <Sidebar 
+      {!showAdminPanel && !sidebarCollapsed && <Sidebar 
         onCheckApi={checkApi} 
         apiStatus={apiStatus}
         members={members}
@@ -1982,7 +1982,7 @@ function App() {
         showToast={showToast}
         onCollapse={() => setSidebarCollapsed(true)}
       />}
-  <main style={{ flex: 1, padding: '6px 12px 12px', display: 'flex', flexDirection: 'column' }}>
+  <main style={{ flex: 1, padding: '6px 12px 12px', display: showAdminPanel ? 'none' : 'flex', flexDirection: 'column' }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>Family Tree Builder</h1>
           {/* Right-aligned action bar (restored). Only change: email is positioned above the Logout button */}
@@ -2117,9 +2117,7 @@ function App() {
             {toast}
           </div>
         )}
-        {showAdminPanel && (
-          <AdminPanel onClose={() => { window.history.back(); }} page adminUnsaved={adminUnsaved} setAdminUnsaved={setAdminUnsaved} />
-        )}
+        {/* AdminPanel is rendered as a sibling of <main> so it can take over the page when route is /admin */}
         {showKinship && (
           <KinshipPanel
             open={showKinship}
@@ -2132,6 +2130,9 @@ function App() {
         {/* popstate is handled in a React effect to keep navigation and prompts inside React */}
         
       </main>
+      {showAdminPanel && (
+        <AdminPanel onClose={() => { window.history.back(); }} page adminUnsaved={adminUnsaved} setAdminUnsaved={setAdminUnsaved} />
+      )}
     </div>
   );
 }

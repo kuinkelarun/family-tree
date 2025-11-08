@@ -49,7 +49,7 @@ export default function AdminTrees({ embedded } = {}) {
   }
 
   return (
-    <div style={{ padding: 12 }}>
+    <div>
       {error && (
         <div style={{ padding: 10, borderRadius: 6, background: '#fffbeb', border: '1px solid #f59e0b', color: '#92400e', marginBottom: 12 }}>
           {error}
@@ -59,8 +59,8 @@ export default function AdminTrees({ embedded } = {}) {
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by title or owner" style={{ padding: 8, flex: 1 }} />
         <button onClick={() => { setOffset(0); load(); }} style={{ padding: '6px 10px' }}>Search</button>
       </div>
-      <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 6 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto', minWidth: 800 }}>
           <thead>
             <tr style={{ textAlign: 'left', background: '#f8fafc' }}>
               <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Title</th>

@@ -20,8 +20,9 @@ export default function AdminPanel({ onClose, page = false, adminUnsaved, setAdm
     if (page && !tab) setTab('trees');
   }, [page]);
   // When rendered as a route/page, use a full-bleed container instead of fixed modal
-  const basePageStyle = { position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, background: '#fff', borderRadius: 0, boxShadow: 'none', zIndex: 1200, padding: 20, overflow: 'auto' };
-  const modalStyle = { position: 'fixed', left: 60, top: 60, right: 60, bottom: 60, background: '#fff', borderRadius: 10, boxShadow: '0 12px 28px rgba(0,0,0,0.18)', zIndex: 1200, padding: 12, overflow: 'auto' };
+  // Do not force an inner scroller here; let the page manage scrolling.
+  const basePageStyle = { position: 'relative', minHeight: '100vh', background: '#fff', borderRadius: 0, boxShadow: 'none', zIndex: 1200, padding: 20 };
+  const modalStyle = { position: 'fixed', left: 60, top: 60, right: 60, bottom: 60, background: '#fff', borderRadius: 10, boxShadow: '0 12px 28px rgba(0,0,0,0.18)', zIndex: 1200, padding: 12 };
   const containerStyle = page
     ? ({ ...basePageStyle, transform: visible ? 'translateY(0)' : 'translateY(8px)', opacity: visible ? 1 : 0, transition: 'opacity 220ms ease, transform 220ms ease' })
     : modalStyle;
@@ -42,21 +43,26 @@ export default function AdminPanel({ onClose, page = false, adminUnsaved, setAdm
             )}
           </div>
         </div>
-        <div>
-          {tab === 'severities' && (
-            <AdminRuleSeverities embedded adminUnsaved={adminUnsaved} setAdminUnsaved={setAdminUnsaved} />
-          )}
-          {tab === 'queue' && (
-            <AdminRecomputeJobs embedded />
-          )}
-          {tab === 'trees' && (
-            <AdminTrees embedded />
-          )}
-          {!tab && (
-            <div style={{ padding: 16, color: '#6b7280' }}>
-              Select a section above to manage validation rules or view the recompute queue.
-            </div>
-          )}
+        {/* Full-width horizontal separator to force consistent width across all tabs */}
+        <div style={{ minWidth: 1200, width: '100%', height: 2, background: '#e5e7eb', marginTop: 12 }}></div>
+        <div style={{ marginTop: 12 }}>
+          {/* Full-width content to match main page layout (no maxWidth constraint) */}
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 12, background: '#fff' }}>
+            {tab === 'severities' && (
+              <AdminRuleSeverities embedded adminUnsaved={adminUnsaved} setAdminUnsaved={setAdminUnsaved} />
+            )}
+            {tab === 'queue' && (
+              <AdminRecomputeJobs embedded />
+            )}
+            {tab === 'trees' && (
+              <AdminTrees embedded />
+            )}
+            {!tab && (
+              <div style={{ padding: 16, color: '#6b7280' }}>
+                Select a section above to manage validation rules or view the recompute queue.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

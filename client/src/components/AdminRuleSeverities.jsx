@@ -122,27 +122,24 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
   }
 
   return (
-    <div style={embedded ? { padding: 12 } : { position: 'fixed', left: 120, top: 120, right: 120, bottom: 120, background: '#fff', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 1300, padding: 20, overflow: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <h3 style={{ margin: 0 }}>Validation Rule Severities</h3>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button disabled={loading} onClick={load} style={{ padding: '6px 10px', borderRadius: 6 }}>Reload</button>
           <button disabled={saving} onClick={handleSave} style={{ padding: '6px 10px', borderRadius: 6, background: '#2563eb', color: '#fff' }}>Save</button>
-          {!embedded && (
-            <button onClick={onClose} style={{ padding: '6px 10px', borderRadius: 6, background: '#ef4444', color: '#fff' }}>Close</button>
-          )}
         </div>
       </div>
-      <p style={{ fontSize: 13, color: '#4b5563', marginTop: 8 }}>Adjust per-tree severities for relationship validation rules. Values: error (block), warn (allow, show warning), off (skip rule).</p>
+      <p style={{ fontSize: 13, color: '#4b5563', marginTop: 0, marginBottom: 12 }}>Adjust per-tree severities for relationship validation rules. Values: error (block), warn (allow, show warning), off (skip rule).</p>
       {error && <div style={{ color: '#b91c1c', marginBottom: 12 }}>{error}</div>}
       {loading ? <div>Loading…</div> : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-              <th style={{ padding: 8, textAlign: 'left' }}>Rule ID</th>
-              <th style={{ padding: 8, textAlign: 'left' }}>Description</th>
-              <th style={{ padding: 8, textAlign: 'center' }}>Severity</th>
-              <th style={{ padding: 8, textAlign: 'center' }}>Actions</th>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto', minWidth: 700 }}>
+            <thead>
+              <tr style={{ textAlign: 'left', background: '#f8fafc' }}>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>Rule ID</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>Description</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>Severity</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -157,7 +154,7 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
                   onMouseEnter={() => setHoveredRow(displayId)}
                   onMouseLeave={() => setHoveredRow(null)}
                   style={{
-                    borderBottom: '1px solid #f3f4f6',
+                    borderBottom: '1px solid #f1f5f9',
                     transition: 'background-color 120ms ease, box-shadow 120ms ease',
                     background: hoveredRow === displayId ? '#f8fafc' : 'transparent',
                     boxShadow: hoveredRow === displayId ? '0 6px 18px rgba(37,99,235,0.06)' : 'none',
@@ -193,6 +190,7 @@ export default function AdminRuleSeverities({ treeId: propTreeId, onClose, embed
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

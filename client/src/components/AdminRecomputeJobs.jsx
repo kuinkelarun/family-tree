@@ -53,23 +53,16 @@ export default function AdminRecomputeJobs({ onClose, embedded = false }) {
   }
 
   return (
-    <div style={embedded ? { padding: 12 } : { position: 'fixed', left: 80, top: 80, right: 80, bottom: 80, background: '#fff', borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.15)', zIndex: 1200, padding: 16, overflow: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <h3 style={{ margin: 0 }}>Recompute Queue</h3>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <button onClick={load} style={{ padding: '6px 8px', borderRadius: 6 }}>Refresh</button>
-          {!embedded && <button onClick={onClose} style={{ padding: '6px 8px', borderRadius: 6, background: '#ef4444', color: '#fff' }}>Close</button>}
-        </div>
-      </div>
-      <hr />
+    <div>
       {error && <div style={{ color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
       {loading ? (
         <div>Loading…</div>
       ) : (
         <>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 13, color: '#6b7280' }}>Total: {total}</div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={load} style={{ padding: '6px 8px', borderRadius: 6, marginRight: 8 }}>Refresh</button>
             <label style={{ fontSize: 13 }}>Per page:</label>
             <select value={limit} onChange={(e) => setLimit(parseInt(e.target.value, 10))}>
               {[10,25,50,100].map(n => <option key={n} value={n}>{n}</option>)}
@@ -78,16 +71,17 @@ export default function AdminRecomputeJobs({ onClose, embedded = false }) {
             <button disabled={(page - 1) * limit + jobs.length >= total} onClick={() => setPage(p => p + 1)}>Next</button>
           </div>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={{ padding: 8 }}>Job ID</th>
-              <th style={{ padding: 8 }}>Tree</th>
-              <th style={{ padding: 8 }}>Status</th>
-              <th style={{ padding: 8 }}>Attempts</th>
-              <th style={{ padding: 8 }}>Next Attempt</th>
-              <th style={{ padding: 8 }}>Last Error</th>
-              <th style={{ padding: 8 }}>Actions</th>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto', minWidth: 900 }}>
+            <thead>
+              <tr style={{ textAlign: 'left', background: '#f8fafc' }}>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Job ID</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Tree</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Status</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Attempts</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Next Attempt</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Last Error</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -95,7 +89,7 @@ export default function AdminRecomputeJobs({ onClose, embedded = false }) {
               <tr><td colSpan={7} style={{ padding: 12, color: '#6b7280' }}>No queued jobs</td></tr>
             )}
             {jobs.map((j) => (
-              <tr key={j._id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+              <tr key={j._id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                 <td style={{ padding: 8, fontSize: 12 }}>{j._id}</td>
                 <td style={{ padding: 8, fontSize: 12 }}>{j.treeId}</td>
                 <td style={{ padding: 8, fontSize: 12 }}>{j.status}</td>
@@ -110,6 +104,7 @@ export default function AdminRecomputeJobs({ onClose, embedded = false }) {
             ))}
           </tbody>
         </table>
+        </div>
         </>
       )}
     </div>
