@@ -6,6 +6,7 @@ import { recomputeGenerationsForTree } from '../utils/generation.js';
 import { enqueueRecompute } from '../utils/recomputeQueue.js';
 import { runAtomic } from '../utils/dbTransactions.js';
 import { loadTreeGraph, validateProposedRelationship } from '../utils/relationshipRules.js';
+import AdminConfig from '../models/AdminConfig.js';
 
 export async function addRelationship(req, res) {
   const parsed = relationshipSchema.safeParse(req.body);
@@ -26,9 +27,13 @@ export async function addRelationship(req, res) {
       // Load graph once for semantic validation
     const graph = await loadTreeGraph(from.tree);
     // Normalize severities which may be stored as a Map (Mongoose) or plain object (lean/JSON)
-    const rawSev = tree.validationConfig?.severities;
-    const severities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
-    const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create', severityOverrides: severities });
+  // Load per-tree severities and global severities and merge (per-tree takes precedence)
+  const rawSev = tree.validationConfig?.severities;
+  const treeSeverities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
+  const cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
+  const globalSeverities = (cfg && cfg.value && typeof cfg.value === 'object') ? cfg.value : {};
+  const combined = { ...globalSeverities, ...treeSeverities };
+  const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create', severityOverrides: combined });
       if (!v.ok) {
         return { ok: false, error: 'Validation failed', errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds };
       }
@@ -99,9 +104,12 @@ export async function updateRelationship(req, res) {
       // Validate the proposed new type before applying
   const graph = await loadTreeGraph(from.tree);
   const nextType = newType || type;
-  const rawSev = tree.validationConfig?.severities;
-  const severities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
-  const v = validateProposedRelationship(graph, String(from._id), String(to._id), nextType, { mode: 'update', previousType: type, severityOverrides: severities });
+      const rawSev = tree.validationConfig?.severities;
+      const treeSeverities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
+      const cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
+      const globalSeverities = (cfg && cfg.value && typeof cfg.value === 'object') ? cfg.value : {};
+      const combined = { ...globalSeverities, ...treeSeverities };
+      const v = validateProposedRelationship(graph, String(from._id), String(to._id), nextType, { mode: 'update', previousType: type, severityOverrides: combined });
       if (!v.ok) {
         return { ok: false, error: 'Validation failed', errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds };
       }
@@ -168,8 +176,11 @@ export async function validateRelationship(req, res) {
       return res.status(403).json({ error: 'Forbidden' });
   const graph = await loadTreeGraph(from.tree);
   const rawSev = tree.validationConfig?.severities;
-  const severities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
-  const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create', severityOverrides: severities });
+  const treeSeverities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
+  const cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
+  const globalSeverities = (cfg && cfg.value && typeof cfg.value === 'object') ? cfg.value : {};
+  const combined = { ...globalSeverities, ...treeSeverities };
+  const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create', severityOverrides: combined });
     return res.json({ ok: v.ok, errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds });
   } catch (e) {
     return res.status(500).json({ error: e.message });

@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import AdminAudit from '../models/AdminAudit.js';
 import User from '../models/User.js';
 import { validationRuleMetadata } from '../utils/relationshipRules.js';
+import AdminConfig from '../models/AdminConfig.js';
 
 const VALID_SEVERITIES = ['error','warn','off'];
 
@@ -120,6 +121,51 @@ export async function getValidationRulesMetadata(req, res) {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+}
+
+// Global severities stored under key 'globalValidationSeverities' as plain object: { ruleId: severity }
+export async function getGlobalSeverities(req, res) {
+  try {
+    // only admins should call this (route enforces requireAdmin)
+    const cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
+    const value = (cfg && cfg.value) ? cfg.value : {};
+    res.json({ ok: true, severities: value });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
+export async function patchGlobalSeverities(req, res) {
+  try {
+    const { updates } = req.body || {};
+    if (!updates || typeof updates !== 'object') return res.status(400).json({ error: 'updates object required' });
+    // Validate severities values
+    const VALID = ['error','warn','off'];
+    for (const [k,v] of Object.entries(updates)) {
+      if (!VALID.includes(v)) return res.status(400).json({ error: `Invalid severity '${v}' for rule '${k}'` });
+    }
+    let cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' });
+    if (!cfg) cfg = new AdminConfig({ key: 'globalValidationSeverities', value: {} });
+    // Merge: updates may set to default; caller should send the canonical desired map
+    cfg.value = { ...(cfg.value || {}), ...updates };
+    await cfg.save();
+    res.json({ ok: true, severities: cfg.value });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+
+export async function deleteGlobalSeverity(req, res) {
+  try {
+    const { ruleId } = req.params;
+    if (!ruleId) return res.status(400).json({ error: 'ruleId required' });
+    let cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' });
+    if (!cfg || !cfg.value || typeof cfg.value !== 'object') return res.json({ ok: true, severities: {} });
+    if (Object.prototype.hasOwnProperty.call(cfg.value, ruleId)) {
+      // remove the key and persist
+      const copy = { ...cfg.value };
+      delete copy[ruleId];
+      cfg.value = copy;
+      await cfg.save();
+    }
+    res.json({ ok: true, severities: cfg.value || {} });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
 // --- Admin Trees listing and management ---
