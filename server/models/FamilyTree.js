@@ -26,6 +26,8 @@ const FamilyTreeSchema = new mongoose.Schema(
         default: new Map(),
       },
     },
+  // Soft-delete timestamp. When set the tree is considered archived/deleted.
+  deletedAt: { type: Date, required: false, index: true },
     // Visual-only nodes for bundling connections (virtual marriage points)
     marriagePoints: {
       type: [

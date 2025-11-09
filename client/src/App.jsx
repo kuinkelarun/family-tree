@@ -4,6 +4,7 @@ import './App.css';
 import Sidebar from './components/Sidebar.jsx';
 import TreeBoard from './components/TreeBoard.jsx';
 import MemberModal from './components/MemberModal.jsx';
+import ArchivedModal from './components/ArchivedModal.jsx';
 import RelationshipPicker from './components/RelationshipPicker.jsx';
 import EdgeEditorPopover from './components/EdgeEditorPopover.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
@@ -1249,6 +1250,7 @@ function App() {
 
   const [relPicker, setRelPicker] = useState({ open: false, source: '', target: '', sourceHandle: '', targetHandle: '' });
   const [modalOpen, setModalOpen] = useState(false);
+  const [archivedOpen, setArchivedOpen] = useState(false);
   const [previewEdge, setPreviewEdge] = useState(null);
 
   // Debug: log when modal state changes to verify wiring in the UI
@@ -1893,16 +1895,16 @@ function App() {
     }
   }
 
-  // Delete the currently selected tree (owner-only). Cascade-deletes members.
+  // Soft-delete (archive) the currently selected tree (owner-only).
   async function handleDeleteTree() {
     if (!treeId) return;
     const title = treeMeta?.title || 'this tree';
     const confirmed = window.confirm(
-      `Are you sure you want to permanently delete "${title}"?\n\nThis will remove the tree and all its members. This action cannot be undone.`
+      `Archive "${title}"?\n\nThis will soft-delete (archive) the tree. You can restore it later from Archived.`
     );
     if (!confirmed) return;
     try {
-      await Trees.delete(treeId);
+      await Trees.delete(treeId, false);
       // Clear UI state
       setTreeIdState('');
       setTreeId('');
@@ -1911,7 +1913,7 @@ function App() {
       setMembers([]);
       setTreeMeta(null);
       await loadMyTrees();
-      showToast('Tree deleted');
+      showToast('Tree archived');
     } catch (e) {
       showToast(`Delete failed: ${e.message}`);
     }
@@ -1998,7 +2000,10 @@ function App() {
                   ))}
                 </select>
                 {isOwner && treeId && (
-                  <button onClick={handleDeleteTree} title="Permanently delete this tree" style={{ padding: '6px 10px', borderRadius: 6, background: '#dc2626', color: '#fff', border: 'none', flexShrink: 0 }}>Delete Tree</button>
+                  <button onClick={handleDeleteTree} title="Archive this tree" style={{ padding: '6px 10px', borderRadius: 6, background: '#dc2626', color: '#fff', border: 'none', flexShrink: 0 }}>Archive</button>
+                )}
+                {isAuthed && (
+                  <button onClick={() => setArchivedOpen(true)} title="View archived trees" style={{ marginLeft: 6, padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1', flexShrink: 0 }}>Archived</button>
                 )}
                 <button title="Refresh list" onClick={loadMyTrees} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1' }}>↻</button>
                 <button onClick={() => setShowKinship(true)} disabled={!treeId || !members.length} style={{ padding: '6px 10px', borderRadius: 6, background: (treeId && members.length) ? '#6b7280' : '#94a3b8', color: '#fff', border: 'none' }}>Kinship</button>
@@ -2112,6 +2117,7 @@ function App() {
           onDelete={canEdit ? (id) => handleDeleteMember(id, true) : undefined}
           onMoveToPool={canEdit ? (id) => handleDeleteMember(id, false) : undefined}
         />
+        <ArchivedModal open={archivedOpen} onClose={() => setArchivedOpen(false)} onRestored={loadMyTrees} />
         {toast && (
           <div style={{ position: 'fixed', right: 16, top: 16, background: '#111827', color: '#fff', padding: '10px 12px', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 1000 }}>
             {toast}

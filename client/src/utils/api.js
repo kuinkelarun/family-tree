@@ -49,7 +49,7 @@ export const Trees = {
   async create(title) { return api('/api/trees', { method: 'POST', body: { title } }); },
   async list() { return api('/api/trees'); },
   async get(id) { return api(`/api/trees/${id}`); },
-  async delete(id) { return api(`/api/trees/${id}`, { method: 'DELETE' }); },
+  async delete(id, hard = false) { const q = hard ? '?hard=true' : ''; return api(`/api/trees/${id}${q}`, { method: 'DELETE' }); },
   async updateMarriagePoint(id, payload) { return api(`/api/trees/${id}/marriage-points`, { method: 'PUT', body: payload }); },
   async kinship(id, from, to, depth = 10, locale = 'en', includePronouns = false) {
     const q = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&depth=${encodeURIComponent(depth)}&locale=${encodeURIComponent(locale)}&includePronouns=${includePronouns ? 'true' : 'false'}`;
@@ -60,6 +60,9 @@ export const Trees = {
     return api(`/api/trees/${id}/kinship/${encodeURIComponent(memberId)}?${q}`);
   },
 };
+// Archived/restore helpers for owner
+Trees.archived = async function listArchived() { return api('/api/trees/archived'); };
+Trees.restore = async function restoreTree(id) { return api(`/api/trees/${encodeURIComponent(id)}/restore`, { method: 'POST' }); };
 
 export const Members = {
   async create(payload) { return api('/api/members', { method: 'POST', body: payload }); },

@@ -9,9 +9,16 @@ import net from 'net';
 
 // Track DB diagnostics for troubleshooting
 let lastDbError = null;
+let reconnectTimeout = null;
+
 mongoose.connection.on('connected', () => {
   console.log('Mongo connected');
   lastDbError = null;
+  // Clear any pending reconnect attempts
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
 });
 mongoose.connection.on('error', (err) => {
   lastDbError = err?.message || String(err);
@@ -19,6 +26,16 @@ mongoose.connection.on('error', (err) => {
 });
 mongoose.connection.on('disconnected', () => {
   console.warn('Mongo disconnected');
+  // Attempt automatic reconnection after 5 seconds
+  if (!reconnectTimeout) {
+    reconnectTimeout = setTimeout(() => {
+      console.log('Attempting to reconnect to MongoDB...');
+      mongoose.connect(process.env.MONGO_URI).catch(err => {
+        console.error('Reconnection failed:', err.message);
+      });
+      reconnectTimeout = null;
+    }, 5000);
+  }
 });
 
 import authRoutes from './routes/auth.js';
@@ -163,7 +180,17 @@ async function connectWithRetry() {
   let attempt = 0;
   while (true) {
     try {
-      await mongoose.connect(MONGO_URI);
+      await mongoose.connect(MONGO_URI, {
+        // Prevent disconnections during device sleep/lock
+        serverSelectionTimeoutMS: 30000, // 30s timeout for initial connection
+        socketTimeoutMS: 45000, // 45s timeout for socket inactivity
+        heartbeatFrequencyMS: 10000, // Ping every 10s to keep connection alive
+        maxPoolSize: 10, // Connection pool size
+        minPoolSize: 2, // Minimum connections to maintain
+        // Auto-reconnect settings
+        retryWrites: true,
+        retryReads: true,
+      });
       console.log('Mongo connected');
       break;
     } catch (err) {

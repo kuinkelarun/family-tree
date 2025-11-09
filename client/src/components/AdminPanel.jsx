@@ -6,6 +6,12 @@ import AdminTrees from './AdminTrees.jsx';
 export default function AdminPanel({ onClose, page = false, adminUnsaved, setAdminUnsaved }) {
   const [tab, setTab] = useState(null); // require explicit selection
   const [visible, setVisible] = useState(false);
+  
+  // Handle navigation back to main page
+  const handleBackToMain = () => {
+    window.history.back();
+  };
+  
   // entrance animation when page mode is used
   useEffect(() => {
     if (page) {
@@ -29,7 +35,38 @@ export default function AdminPanel({ onClose, page = false, adminUnsaved, setAdm
   return (
     <div>
       <div style={containerStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Back to Main Page button - only shown in page mode */}
+          {page && (
+            <button 
+              onClick={handleBackToMain}
+              style={{ 
+                padding: '8px 14px', 
+                borderRadius: 6, 
+                background: '#f3f4f6', 
+                color: '#374151',
+                border: '1px solid #e5e7eb',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#e5e7eb';
+                e.currentTarget.style.borderColor = '#d1d5db';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f3f4f6';
+                e.currentTarget.style.borderColor = '#e5e7eb';
+              }}
+            >
+              <span style={{ fontSize: '16px' }}>←</span>
+              Back
+            </button>
+          )}
           <h2 style={{ margin: 0 }}>Admin</h2>
           <div style={{ display: 'flex', gap: 8, marginLeft: 12 }}>
             <button onClick={() => setTab('trees')} style={{ padding: '6px 10px', borderRadius: 6, background: tab === 'trees' ? '#111827' : '#e5e7eb', color: tab === 'trees' ? '#fff' : '#111827' }}>Trees</button>

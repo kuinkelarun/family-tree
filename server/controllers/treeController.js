@@ -21,6 +21,8 @@ export async function getTree(req, res) {
     // Populate members and convert to plain object to ensure all fields are included
     const tree = await FamilyTree.findById(req.params.id).populate('members').lean();
     if (!tree) return res.status(404).json({ error: 'Not found' });
+    // Hide soft-deleted trees from normal access
+    if (tree.deletedAt) return res.status(404).json({ error: 'Not found' });
     // Simple access check: owner or permission entry
     const allowed = String(tree.owner) === String(req.user.id) || 
       tree.permissions?.some((p) => String(p.user) === String(req.user.id));
@@ -37,7 +39,11 @@ export async function getTree(req, res) {
 
 export async function listMyTrees(req, res) {
   try {
-    const trees = await FamilyTree.find({ $or: [{ owner: req.user.id }, { 'permissions.user': req.user.id }] }).select('title owner settings createdAt updatedAt');
+    // By default exclude soft-deleted trees. If caller provides ?showDeleted=true include them.
+    const includeDeleted = req.query.showDeleted === 'true';
+    const baseQ = { $or: [{ owner: req.user.id }, { 'permissions.user': req.user.id }] };
+    if (!includeDeleted) baseQ.deletedAt = { $exists: false };
+    const trees = await FamilyTree.find(baseQ).select('title owner settings createdAt updatedAt deletedAt');
     res.json(trees);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -51,9 +57,42 @@ export async function deleteTree(req, res) {
     // Only owner may delete an entire tree
     if (!tree.owner.equals(req.user.id)) return res.status(403).json({ error: 'Forbidden' });
 
-    // Remove all members belonging to this tree, then delete the tree
-    await Member.deleteMany({ tree: tree._id });
-    await tree.deleteOne();
+    const hard = !!req.query.hard;
+    if (hard) {
+      // permanent removal: cascade-delete members then remove tree
+      await Member.deleteMany({ tree: tree._id });
+      await tree.deleteOne();
+      return res.json({ ok: true, deleted: true });
+    }
+
+    // Soft-delete: mark with deletedAt timestamp so it can be restored later
+    tree.deletedAt = new Date();
+    await tree.save();
+    return res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function listArchivedTrees(req, res) {
+  try {
+    // list soft-deleted trees for the current user
+  const trees = await FamilyTree.find({ owner: req.user.id, deletedAt: { $exists: true } }).populate('owner', 'email').select('title owner createdAt deletedAt').lean();
+  // Map owner email into ownerEmail for client convenience
+  const out = trees.map(t => ({ ...t, ownerEmail: t.owner?.email || String(t.owner) }));
+  res.json(out);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+export async function restoreTree(req, res) {
+  try {
+    const tree = await FamilyTree.findById(req.params.id);
+    if (!tree) return res.status(404).json({ error: 'Not found' });
+    if (!tree.owner.equals(req.user.id)) return res.status(403).json({ error: 'Forbidden' });
+    tree.deletedAt = undefined;
+    await tree.save();
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
