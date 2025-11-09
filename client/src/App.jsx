@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar.jsx';
 import TreeBoard from './components/TreeBoard.jsx';
 import MemberModal from './components/MemberModal.jsx';
 import ArchivedModal from './components/ArchivedModal.jsx';
+import CreateTreeModal from './components/CreateTreeModal.jsx';
 import RelationshipPicker from './components/RelationshipPicker.jsx';
 import EdgeEditorPopover from './components/EdgeEditorPopover.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
@@ -33,6 +34,7 @@ function App() {
   const [token, setTokenState] = useState(getToken() || '');
   const [currentUser, setCurrentUser] = useState(null);
   const [showAdminPanel, setShowAdminPanel] = useState(window.location.pathname === '/admin');
+  const [createOpen, setCreateOpen] = useState(false);
   const [adminUnsaved, setAdminUnsaved] = useState(false);
   const [treeId, setTreeIdState] = useState(getTreeId());
   const [nodes, setNodes] = useState([]);
@@ -105,6 +107,21 @@ function App() {
       await loadMyTrees();
     } catch (e) {
       showToast(`Create tree failed: ${e.message}`);
+    }
+  }
+
+  async function handleTreeCreated(tree) {
+    try {
+      if (!tree || !tree._id) return;
+      setCreateOpen(false);
+      setTreeIdState(tree._id);
+      setTreeId(tree._id);
+      await loadTree(tree._id);
+      await loadMyTrees();
+      showToast('Tree created');
+    } catch (e) {
+      console.error('[handleTreeCreated] error', e);
+      showToast(`Load tree failed: ${e.message}`);
     }
   }
 
@@ -1992,7 +2009,7 @@ function App() {
             {isAuthed ? (
               <>
                 {/* Keep original order of controls */}
-                <button onClick={handleCreateTree} style={{ padding: '6px 10px', borderRadius: 6, background: '#16a34a', color: '#fff', border: 'none', flexShrink: 0 }}>Create Tree</button>
+                <button onClick={() => setCreateOpen(true)} style={{ padding: '6px 10px', borderRadius: 6, background: '#16a34a', color: '#fff', border: 'none', flexShrink: 0 }}>Create Tree</button>
                 <select value={treeId || ''} onChange={(e) => { const id = e.target.value; handleSelectTree(id); }} style={{ padding: 6 }}>
                   <option value="">Select a tree…</option>
                   {myTrees.map((t) => (
@@ -2122,7 +2139,16 @@ function App() {
         <ArchivedModal
           open={archivedOpen}
           onClose={() => setArchivedOpen(false)}
-          onRestored={async () => { await loadMyTrees(); showToast('Tree restored'); }}
+          onRestored={async (action) => {
+            await loadMyTrees();
+            if (action === 'requestedDelete') showToast('Delete requested — pending admin review');
+            else showToast('Tree restored');
+          }}
+        />
+        <CreateTreeModal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(tree) => { handleTreeCreated(tree); }}
         />
         {toast && (
           <div style={{ position: 'fixed', right: 16, top: 16, background: '#111827', color: '#fff', padding: '10px 12px', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 99999 }}>

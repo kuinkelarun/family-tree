@@ -28,6 +28,10 @@ const FamilyTreeSchema = new mongoose.Schema(
     },
   // Soft-delete timestamp. When set the tree is considered archived/deleted.
   deletedAt: { type: Date, required: false, index: true },
+    // When an owner requests a permanent delete that requires admin review, this flag marks it pending.
+    pendingAdminDeletion: { type: Boolean, default: false, index: true },
+    pendingDeletionRequestedAt: { type: Date, required: false },
+    pendingDeletionRequestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
     // Visual-only nodes for bundling connections (virtual marriage points)
     marriagePoints: {
       type: [

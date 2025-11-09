@@ -63,6 +63,7 @@ export const Trees = {
 // Archived/restore helpers for owner
 Trees.archived = async function listArchived() { return api('/api/trees/archived'); };
 Trees.restore = async function restoreTree(id) { return api(`/api/trees/${encodeURIComponent(id)}/restore`, { method: 'POST' }); };
+Trees.requestAdminDelete = async function requestAdminDelete(id) { return api(`/api/trees/${encodeURIComponent(id)}/request-admin-delete`, { method: 'POST' }); };
 
 export const Members = {
   async create(payload) { return api('/api/members', { method: 'POST', body: payload }); },

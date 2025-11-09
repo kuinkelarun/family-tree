@@ -13,8 +13,7 @@ import 'reactflow/dist/style.css';
 import FamilyNode from './FamilyNode';
 import MarriagePointNode from './nodes/MarriagePointNode';
 
-// Keep nodeTypes stable across renders to avoid React Flow warnings about changing types
-const nodeTypes = { familyNode: FamilyNode, marriagePoint: MarriagePointNode };
+// nodeTypes are memoized inside the component to keep a stable reference
 
 const initialNodes = [
   { id: 'me', position: { x: 0, y: 0 }, data: { label: 'You' }, type: 'familyNode' },
@@ -69,6 +68,10 @@ export default function TreeBoard({
   const [counter, setCounter] = useState(1);
   const [maximized, setMaximized] = useState(false);
   const [rfInstance, setRfInstance] = useState(null);
+  // Memoize node types so React Flow sees a stable object reference
+  const nodeTypesMemo = React.useMemo(() => ({ familyNode: FamilyNode, marriagePoint: MarriagePointNode }), []);
+  // Only mount ReactFlow once the container has a positive size to avoid React Flow measurement warnings
+  const [flowReady, setFlowReady] = useState(false);
   const [notice, setNotice] = useState('');
   // Alignment guide state (flow-space coordinates)
   const [alignGuides, setAlignGuides] = useState({ x: null, y: null });
@@ -539,6 +542,29 @@ export default function TreeBoard({
     return () => clearTimeout(t);
   }, [rfInstance, nodes]);
 
+  // Mount-safety: only render ReactFlow after the exportRef container has a measurable size.
+  useEffect(() => {
+    const el = exportRef?.current;
+    if (!el) return;
+    const check = () => {
+      try {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) setFlowReady(true);
+      } catch (e) {}
+    };
+    check();
+    let ro;
+    try {
+      ro = new ResizeObserver(() => check());
+      ro.observe(el);
+    } catch (e) {
+      // ResizeObserver may not be available in some environments; fallback to a timeout re-check
+      const id = setTimeout(() => check(), 120);
+      return () => clearTimeout(id);
+    }
+    return () => { try { ro.disconnect(); } catch (e) {} };
+  }, [exportRef]);
+
   useEffect(() => {
     if (maximized) return;
     const onKey = (e) => {
@@ -615,7 +641,8 @@ export default function TreeBoard({
           {maximized ? 'Exit Fullscreen' : 'Maximize'}
         </button>
       </div>
-      <div ref={exportRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+      <div ref={exportRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative', height: '100%' }}>
+      {flowReady ? (
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -624,8 +651,8 @@ export default function TreeBoard({
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
-        // Make the identity rock-solid for React Flow by memoizing
-        nodeTypes={React.useMemo(() => nodeTypes, [])}
+  // Use memoized node types to keep reference stable
+  nodeTypes={nodeTypesMemo}
         onEdgeUpdate={onEdgeUpdate}
         connectionLineType="smoothstep"
         connectionMode="loose"
@@ -658,6 +685,7 @@ export default function TreeBoard({
         <Controls position="bottom-left" />
         <Background variant="dots" gap={16} size={1} />
       </ReactFlow>
+      ) : null}
       {/* Alignment guides overlay (screen-space) with smooth fade */}
       {(() => {
         const z = viewport?.zoom || 1;

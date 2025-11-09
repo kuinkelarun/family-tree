@@ -59,7 +59,15 @@ export default function ArchivedModal({ open, onClose, onRestored }) {
                   <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9' }}>{t.deletedAt ? new Date(t.deletedAt).toLocaleString() : ''}</td>
                   <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9' }}>
                     <button onClick={async () => { try { await Trees.restore(t._id); await load(); onRestored && onRestored(); } catch (e) { console.error(e); setError('Restore failed'); } }} style={{ marginRight: 8, padding: '6px 10px' }}>Restore</button>
-                    <button onClick={async () => { if (!window.confirm('Permanently delete this tree? This cannot be undone.')) return; try { await Trees.delete(t._id, true); await load(); onRestored && onRestored(); } catch (e) { console.error(e); setError('Permanent delete failed'); } }} style={{ padding: '6px 10px', background: '#ef4444', color: '#fff', border: 'none' }}>Delete</button>
+                      <button onClick={async () => {
+                        if (!window.confirm('Delete this tree? This will send a request to admins for final removal and will be removed from your archived list.')) return;
+                        try {
+                          await Trees.requestAdminDelete(t._id);
+                          // Remove from local list so owner no longer sees it in Archived
+                          setItems((prev) => prev.filter((x) => String(x._id) !== String(t._id)));
+                          onRestored && onRestored('requestedDelete');
+                        } catch (e) { console.error(e); setError('Delete request failed'); }
+                      }} style={{ padding: '6px 10px', background: '#ef4444', color: '#fff', border: 'none' }}>Delete</button>
                   </td>
                 </tr>
               ))}

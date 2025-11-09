@@ -1,6 +1,7 @@
 import { listQueuedJobs, forceRetry, removeJob } from '../utils/recomputeQueue.js';
 import RecomputeJob from '../models/RecomputeJob.js';
 import FamilyTree from '../models/FamilyTree.js';
+import Member from '../models/Member.js';
 import mongoose from 'mongoose';
 import AdminAudit from '../models/AdminAudit.js';
 import User from '../models/User.js';
@@ -137,14 +138,16 @@ export async function listTrees(req, res) {
     }
 
     const pipeline = [];
-    // Exclude soft-deleted trees by default
-    if (!req.query.showDeleted) pipeline.push({ $match: { deletedAt: { $exists: false } } });
 
     // If the caller is not an admin, restrict results to trees the user owns or has permissions on
     const userPayload = req.user || {};
     const roles = Array.isArray(userPayload.roles) ? userPayload.roles.map(r => String(r).toLowerCase()) : [];
     const envAdmins = (process.env.ADMIN_EMAILS || '').split(',').map(s => s.trim()).filter(Boolean);
     const isAdmin = roles.includes('admin') || (userPayload.email && envAdmins.includes(userPayload.email));
+
+    // Exclude soft-deleted trees by default for non-admins; admins see all states (including archived and pending admin deletion)
+    if (!req.query.showDeleted && !isAdmin) pipeline.push({ $match: { deletedAt: { $exists: false } } });
+
     if (!isAdmin) {
       try {
         const uid = mongoose.Types.ObjectId(userPayload.id);
@@ -164,8 +167,17 @@ export async function listTrees(req, res) {
         as: 'ownerDoc',
       }
     });
+    // Lookup the user who requested admin deletion (if any) to expose requester email
+    pipeline.push({
+      $lookup: {
+        from: User.collection.name,
+        localField: 'pendingDeletionRequestedBy',
+        foreignField: '_id',
+        as: 'requesterDoc',
+      }
+    });
     // Simplify owner email into a top-level field for easier matching
-    pipeline.push({ $addFields: { ownerEmail: { $arrayElemAt: ['$ownerDoc.email', 0] } } });
+    pipeline.push({ $addFields: { ownerEmail: { $arrayElemAt: ['$ownerDoc.email', 0] }, requesterEmail: { $arrayElemAt: ['$requesterDoc.email', 0] } } });
 
     if (search) {
       if (search.includes('@')) {
@@ -196,7 +208,7 @@ export async function listTrees(req, res) {
           { $sort: { [sortField]: dir } },
           { $skip: offset },
           { $limit: limit },
-          { $project: { title: 1, owner: 1, ownerEmail: 1, createdAt: 1, updatedAt: 1, members: 1, deletedAt: 1 } }
+          { $project: { title: 1, owner: 1, ownerEmail: 1, createdAt: 1, updatedAt: 1, members: 1, deletedAt: 1, pendingAdminDeletion: 1, pendingDeletionRequestedAt: 1, pendingDeletionRequestedBy: 1 } }
         ]
       }
     });
@@ -215,6 +227,9 @@ export async function listTrees(req, res) {
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
       deletedAt: t.deletedAt || null,
+      pendingAdminDeletion: !!t.pendingAdminDeletion,
+      pendingDeletionRequestedAt: t.pendingDeletionRequestedAt || null,
+      pendingDeletionRequestedBy: t.pendingDeletionRequestedBy || null,
       nodeCount: Array.isArray(t.members) ? t.members.length : 0,
     }));
 
@@ -252,9 +267,20 @@ export async function postArchiveTree(req, res) {
     const { archive } = req.body || {};
     const tree = await FamilyTree.findById(id);
     if (!tree) return res.status(404).json({ error: 'Tree not found' });
-    tree.deletedAt = archive ? new Date() : undefined;
+    if (archive) {
+      tree.deletedAt = new Date();
+      await tree.save();
+      await AdminAudit.create({ actor: req.user.id, action: 'archive-tree', treeId: tree._id, details: { archive: true } });
+      return res.json({ ok: true });
+    }
+
+    // restore / unarchive: also clear any pending admin-deletion flags
+    tree.deletedAt = undefined;
+    tree.pendingAdminDeletion = false;
+    tree.pendingDeletionRequestedAt = undefined;
+    tree.pendingDeletionRequestedBy = undefined;
     await tree.save();
-    await AdminAudit.create({ actor: req.user.id, action: 'archive-tree', treeId: tree._id, details: { archive: !!archive } });
+    await AdminAudit.create({ actor: req.user.id, action: 'restore-tree', treeId: tree._id, details: {} });
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -285,6 +311,18 @@ export async function deleteTree(req, res) {
     const tree = await FamilyTree.findById(id);
     if (!tree) return res.status(404).json({ error: 'Tree not found' });
     if (hard) {
+      // Cascade-delete related data to avoid orphaned members and jobs
+      try {
+        await Member.deleteMany({ tree: id });
+      } catch (e) {
+        // log but continue with tree deletion
+        console.error('[adminController.deleteTree] failed to delete members for tree', id, e);
+      }
+      try {
+        await RecomputeJob.deleteMany({ treeId: id });
+      } catch (e) {
+        console.error('[adminController.deleteTree] failed to delete recompute jobs for tree', id, e);
+      }
       await FamilyTree.deleteOne({ _id: id });
       await AdminAudit.create({ actor: req.user.id, action: 'delete-tree-hard', treeId: id, details: {} });
       return res.json({ ok: true, deleted: true });

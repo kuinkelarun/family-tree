@@ -4,6 +4,7 @@ import { treeSchema } from '../utils/validate.js';
 import { recomputeGenerationsForTree } from '../utils/generation.js';
 import { enqueueRecompute } from '../utils/recomputeQueue.js';
 import { startWorker } from '../utils/recomputeQueue.js';
+import AdminAudit from '../models/AdminAudit.js';
 
 export async function createTree(req, res) {
   try {
@@ -59,10 +60,14 @@ export async function deleteTree(req, res) {
 
     const hard = !!req.query.hard;
     if (hard) {
-      // permanent removal: cascade-delete members then remove tree
-      await Member.deleteMany({ tree: tree._id });
-      await tree.deleteOne();
-      return res.json({ ok: true, deleted: true });
+      // Owner-requested *permanent* delete should not immediately erase data.
+      // Instead mark as pending admin deletion so admins can review and perform the final removal.
+      tree.pendingAdminDeletion = true;
+      tree.pendingDeletionRequestedAt = new Date();
+      tree.pendingDeletionRequestedBy = req.user.id;
+      await tree.save();
+      await AdminAudit.create({ actor: req.user.id, action: 'request-admin-delete', treeId: tree._id, details: {} });
+      return res.json({ ok: true, pendingAdminDeletion: true });
     }
 
     // Soft-delete: mark with deletedAt timestamp so it can be restored later
@@ -74,10 +79,30 @@ export async function deleteTree(req, res) {
   }
 }
 
+// Owner requests admin review to permanently delete this tree
+export async function requestAdminDelete(req, res) {
+  try {
+    const tree = await FamilyTree.findById(req.params.id);
+    if (!tree) return res.status(404).json({ error: 'Not found' });
+    // Only owner may request admin deletion
+    if (!tree.owner.equals(req.user.id)) return res.status(403).json({ error: 'Forbidden' });
+
+    tree.pendingAdminDeletion = true;
+    tree.pendingDeletionRequestedAt = new Date();
+    tree.pendingDeletionRequestedBy = req.user.id;
+    await tree.save();
+    await AdminAudit.create({ actor: req.user.id, action: 'request-admin-delete', treeId: tree._id, details: {} });
+    res.json({ ok: true, pendingAdminDeletion: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
 export async function listArchivedTrees(req, res) {
   try {
     // list soft-deleted trees for the current user
-  const trees = await FamilyTree.find({ owner: req.user.id, deletedAt: { $exists: true } }).populate('owner', 'email').select('title owner createdAt deletedAt').lean();
+  // Exclude trees that have been requested for admin deletion so owners no longer see them in their Archived list
+  const trees = await FamilyTree.find({ owner: req.user.id, deletedAt: { $exists: true }, pendingAdminDeletion: { $ne: true } }).populate('owner', 'email').select('title owner createdAt deletedAt pendingAdminDeletion').lean();
   // Map owner email into ownerEmail for client convenience
   const out = trees.map(t => ({ ...t, ownerEmail: t.owner?.email || String(t.owner) }));
   res.json(out);
