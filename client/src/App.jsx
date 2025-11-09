@@ -2030,7 +2030,7 @@ function App() {
           setNodes={setNodes}
           setEdges={setEdges}
           onAddPersonAt={isAuthed && treeId && canEdit ? handleAddPersonAt : undefined}
-          canAdd={!!(isAuthed && treeId && canEdit)}
+          canAdd={!!(isAuthed && myTrees && myTrees.length > 0 && treeId && canEdit)}
           onConnect={isAuthed && canEdit ? handleConnectEdge : undefined}
           onNodeDoubleClick={handleSelectNode}
           onNodeDragStop={isAuthed && canEdit ? handleNodeDragStop : undefined}
@@ -2041,6 +2041,8 @@ function App() {
           onAutoLayout={handleAutoLayout}
           layoutActive={layoutActive}
           layoutBusy={layoutBusy}
+          controlsDisabled={!myTrees || myTrees.length === 0 || !treeId}
+          showToast={showToast}
         />
         {relPicker.open && (
           <RelationshipPicker

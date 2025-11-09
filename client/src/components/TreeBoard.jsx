@@ -50,6 +50,8 @@ export default function TreeBoard({
   onAutoLayout, // trigger layered auto layout or revert
   layoutActive = false, // if true, button will say "Revert Layout"
   layoutBusy = false,
+  controlsDisabled = false,
+  showToast = null,
 }) {
   const controlled = Array.isArray(extNodes) && Array.isArray(extEdges);
   const [nodesLocal, setNodesLocal, onNodesChangeLocal] = useNodesState(initialNodes);
@@ -569,10 +571,16 @@ export default function TreeBoard({
   return (
     <div style={containerStyle}>
       <div style={{ padding: 8, borderBottom: '1px solid #f1f5f9', display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button onClick={addPerson} disabled={!canAdd} style={{ padding: '6px 10px', borderRadius: 6, background: canAdd ? '#1f6feb' : '#94a3b8', color: '#fff', border: 'none', cursor: canAdd ? 'pointer' : 'not-allowed' }}>
+        <button
+          onClick={(e) => { if (canAdd) addPerson(); else if (typeof showToast === 'function') showToast('Create or select a tree to add node.'); }}
+          aria-disabled={!canAdd}
+          tabIndex={canAdd ? 0 : -1}
+          title={!canAdd ? 'Create or select a tree to add node.' : undefined}
+          style={{ padding: '6px 10px', borderRadius: 6, background: canAdd ? '#1f6feb' : '#c7d2fe', color: '#fff', border: 'none', cursor: canAdd ? 'pointer' : 'not-allowed' }}
+        >
           + Add Node
         </button>
-        <button onClick={onAutoLayout} disabled={layoutBusy} style={{ padding: '6px 10px', borderRadius: 6, background: layoutBusy ? '#94a3b8' : '#475569', color: '#fff', border: 'none' }}>
+        <button onClick={onAutoLayout} disabled={layoutBusy || controlsDisabled} style={{ padding: '6px 10px', borderRadius: 6, background: (layoutBusy || controlsDisabled) ? '#94a3b8' : '#475569', color: '#fff', border: 'none', cursor: (layoutBusy || controlsDisabled) ? 'not-allowed' : 'pointer' }}>
           {layoutBusy ? 'Applying…' : (layoutActive ? 'Revert Layout' : 'Auto Layout')}
         </button>
         <span style={{ color: '#64748b', fontSize: 12, flex: '1 1 0', minWidth: 0 }}>
@@ -603,7 +611,7 @@ export default function TreeBoard({
           </span>
         </div>
 
-        <button onClick={() => setMaximized((m) => !m)} style={{ padding: '6px 10px', borderRadius: 6, background: '#0f172a', color: '#fff', border: 'none' }}>
+        <button onClick={() => setMaximized((m) => !m)} disabled={controlsDisabled} style={{ padding: '6px 10px', borderRadius: 6, background: controlsDisabled ? '#94a3b8' : '#0f172a', color: '#fff', border: 'none', cursor: controlsDisabled ? 'not-allowed' : 'pointer' }}>
           {maximized ? 'Exit Fullscreen' : 'Maximize'}
         </button>
       </div>
