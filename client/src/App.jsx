@@ -2117,9 +2117,13 @@ function App() {
           onDelete={canEdit ? (id) => handleDeleteMember(id, true) : undefined}
           onMoveToPool={canEdit ? (id) => handleDeleteMember(id, false) : undefined}
         />
-        <ArchivedModal open={archivedOpen} onClose={() => setArchivedOpen(false)} onRestored={loadMyTrees} />
+        <ArchivedModal
+          open={archivedOpen}
+          onClose={() => setArchivedOpen(false)}
+          onRestored={async () => { await loadMyTrees(); showToast('Tree restored'); }}
+        />
         {toast && (
-          <div style={{ position: 'fixed', right: 16, top: 16, background: '#111827', color: '#fff', padding: '10px 12px', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 1000 }}>
+          <div style={{ position: 'fixed', right: 16, top: 16, background: '#111827', color: '#fff', padding: '10px 12px', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.25)', zIndex: 99999 }}>
             {toast}
           </div>
         )}
