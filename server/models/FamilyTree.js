@@ -19,12 +19,7 @@ const FamilyTreeSchema = new mongoose.Schema(
       styles: { type: Object, default: {} },
     },
     validationConfig: {
-      severities: {
-        // ruleId -> 'error' | 'warn' | 'off'
-        type: Map,
-        of: { type: String, enum: ['error', 'warn', 'off'] },
-        default: new Map(),
-      },
+      // Per-tree validation configuration removed in favor of global-only severities.
     },
   // Soft-delete timestamp. When set the tree is considered archived/deleted.
   deletedAt: { type: Date, required: false, index: true },

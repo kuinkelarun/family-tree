@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import FamilyTree from '../models/FamilyTree.js';
 import Member from '../models/Member.js';
 import { loadTreeGraph, validateProposedRelationship } from '../utils/relationshipRules.js';
+import AdminConfig from '../models/AdminConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,27 +29,27 @@ async function run() {
     const base = validateProposedRelationship(graph, String(B._id), String(A._id), 'parent', { mode: 'create' });
     console.log('Baseline:', base);
 
-    // Override cycle rule to warn
-    tree.validationConfig = tree.validationConfig || {};
-    tree.validationConfig.severities = new Map([['no-cycle','warn']]);
-    await tree.save();
+    // Apply a global override to make no-cycle -> warn for the purpose of this smoke test
+    await AdminConfig.deleteMany({ key: 'globalValidationSeverities' });
+    await AdminConfig.create({ key: 'globalValidationSeverities', value: { 'no-cycle': 'warn' } });
+    const cfg2 = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
+    const gv = (cfg2 && cfg2.value && typeof cfg2.value === 'object') ? cfg2.value : {};
     const graph2 = await loadTreeGraph(tree._id);
-  const raw = tree.validationConfig?.severities;
-  const sev = raw instanceof Map ? Object.fromEntries(raw.entries()) : (raw && typeof raw === 'object' ? { ...raw } : {});
-  const overridden = validateProposedRelationship(graph2, String(B._id), String(A._id), 'parent', { mode: 'create', severityOverrides: sev });
-    console.log('Overridden (no-cycle -> warn):', overridden);
+    const overridden = validateProposedRelationship(graph2, String(B._id), String(A._id), 'parent', { mode: 'create', severityOverrides: gv });
+    console.log('Overridden by global (no-cycle -> warn):', overridden);
 
     // Disable grandparent rule (simulate ancestor distance >=2). Add C as parent of B then test B parent A again.
     const C = await Member.create({ tree: tree._id, name: 'C', relationships: [] });
     B.relationships.push({ type: 'parent', relative: C._id });
     await B.save();
     const graph3 = await loadTreeGraph(tree._id);
-    tree.validationConfig.severities.set('no-grandparent-as-parent','off');
-    await tree.save();
-  const raw2 = tree.validationConfig?.severities;
-  const sev2 = raw2 instanceof Map ? Object.fromEntries(raw2.entries()) : (raw2 && typeof raw2 === 'object' ? { ...raw2 } : {});
-  const withOff = validateProposedRelationship(graph3, String(C._id), String(A._id), 'parent', { mode: 'create', severityOverrides: sev2 });
-    console.log('With no-grandparent-as-parent off:', withOff);
+    // Update global config to disable no-grandparent-as-parent
+    const cfg3 = await AdminConfig.findOne({ key: 'globalValidationSeverities' });
+    cfg3.value = { ...(cfg3.value || {}), 'no-grandparent-as-parent': 'off' };
+    await cfg3.save();
+    const gv2 = (cfg3 && cfg3.value && typeof cfg3.value === 'object') ? cfg3.value : {};
+    const withOff = validateProposedRelationship(graph3, String(C._id), String(A._id), 'parent', { mode: 'create', severityOverrides: gv2 });
+    console.log('With global no-grandparent-as-parent off:', withOff);
   } catch (e) {
     console.error('Severity smoke failed', e);
   } finally {

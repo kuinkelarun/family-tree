@@ -107,9 +107,7 @@ export const Admin = {
   async forceRetryJob(jobId) { return api(`/api/admin/recompute-queue/${encodeURIComponent(jobId)}/retry`, { method: 'POST' }); },
   async removeJob(jobId) { return api(`/api/admin/recompute-queue/${encodeURIComponent(jobId)}`, { method: 'DELETE' }); },
   async getValidationRules() { return api('/api/admin/validation/rules'); },
-  async getSeverities(treeId) { return api(`/api/admin/trees/${encodeURIComponent(treeId)}/severities`); },
-  async patchSeverities(treeId, updates) { return api(`/api/admin/trees/${encodeURIComponent(treeId)}/severities`, { method: 'PATCH', body: { updates } }); },
-  async deleteSeverity(treeId, ruleId) { return api(`/api/admin/trees/${encodeURIComponent(treeId)}/severities/${encodeURIComponent(ruleId)}`, { method: 'DELETE' }); },
+  // Per-tree severity endpoints removed; use global severities only via getGlobalSeverities/patchGlobalSeverities
   // Global severities (admins only)
   async getGlobalSeverities() { return api('/api/admin/validation/global-severities'); },
   async patchGlobalSeverities(updates) { return api('/api/admin/validation/global-severities', { method: 'PATCH', body: { updates } }); },

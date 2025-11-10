@@ -24,15 +24,12 @@ export async function addRelationship(req, res) {
       if (!(tree.owner.equals(req.user.id) || tree.permissions.some((p) => p.user.equals(req.user.id) && p.access !== 'viewer')))
         throw new Error('Forbidden');
 
-      // Load graph once for semantic validation
-    const graph = await loadTreeGraph(from.tree);
-    // Normalize severities which may be stored as a Map (Mongoose) or plain object (lean/JSON)
-  // Load per-tree severities and global severities and merge (per-tree takes precedence)
-  const rawSev = tree.validationConfig?.severities;
-  const treeSeverities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
-  const cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
-  const globalSeverities = (cfg && cfg.value && typeof cfg.value === 'object') ? cfg.value : {};
-  const combined = { ...globalSeverities, ...treeSeverities };
+          // Load graph once for semantic validation
+          const graph = await loadTreeGraph(from.tree);
+          // Use global severities only (per-tree overrides removed)
+          const cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
+          const globalSeverities = (cfg && cfg.value && typeof cfg.value === 'object') ? cfg.value : {};
+          const combined = { ...globalSeverities };
   const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create', severityOverrides: combined });
       if (!v.ok) {
         return { ok: false, error: 'Validation failed', errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds };
@@ -102,13 +99,12 @@ export async function updateRelationship(req, res) {
       if (idx === -1) throw new Error('Relationship not found');
 
       // Validate the proposed new type before applying
-  const graph = await loadTreeGraph(from.tree);
-  const nextType = newType || type;
-      const rawSev = tree.validationConfig?.severities;
-      const treeSeverities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
-      const cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
-      const globalSeverities = (cfg && cfg.value && typeof cfg.value === 'object') ? cfg.value : {};
-      const combined = { ...globalSeverities, ...treeSeverities };
+    const graph = await loadTreeGraph(from.tree);
+    const nextType = newType || type;
+    // Use global severities only (per-tree overrides removed)
+    const cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
+    const globalSeverities = (cfg && cfg.value && typeof cfg.value === 'object') ? cfg.value : {};
+    const combined = { ...globalSeverities };
       const v = validateProposedRelationship(graph, String(from._id), String(to._id), nextType, { mode: 'update', previousType: type, severityOverrides: combined });
       if (!v.ok) {
         return { ok: false, error: 'Validation failed', errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds };
@@ -175,11 +171,10 @@ export async function validateRelationship(req, res) {
     if (!(tree.owner.equals(req.user.id) || tree.permissions.some((p) => p.user.equals(req.user.id) && p.access !== 'viewer')))
       return res.status(403).json({ error: 'Forbidden' });
   const graph = await loadTreeGraph(from.tree);
-  const rawSev = tree.validationConfig?.severities;
-  const treeSeverities = rawSev instanceof Map ? Object.fromEntries(rawSev.entries()) : (rawSev && typeof rawSev === 'object' ? { ...rawSev } : {});
+  // Use global severities only (per-tree overrides removed)
   const cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' }).lean();
   const globalSeverities = (cfg && cfg.value && typeof cfg.value === 'object') ? cfg.value : {};
-  const combined = { ...globalSeverities, ...treeSeverities };
+  const combined = { ...globalSeverities };
   const v = validateProposedRelationship(graph, String(from._id), String(to._id), type, { mode: 'create', severityOverrides: combined });
     return res.json({ ok: v.ok, errors: v.errors, warnings: v.warnings, ruleIds: v.ruleIds });
   } catch (e) {

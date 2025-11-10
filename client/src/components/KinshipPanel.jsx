@@ -1,4 +1,6 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useModalAccessibility } from '../utils/modalHelpers.js';
 import { displayMemberName } from '../utils/format.js';
 import { Trees } from '../utils/api.js';
 
@@ -32,6 +34,8 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
   }, [members]);
 
   if (!open) return null;
+  const panelRef = useRef(null);
+  useModalAccessibility(open, onClose, panelRef);
 
   async function runQuery() {
     try {
@@ -52,9 +56,9 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
     }
   }
 
-  return (
+  const el = (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: 'min(720px, 96vw)', background: '#fff', borderRadius: 10, border: '1px solid #e5e7eb', boxShadow: '0 12px 32px rgba(0,0,0,0.18)', padding: 16 }}>
+      <div ref={panelRef} style={{ width: 'min(720px, 96vw)', background: '#fff', borderRadius: 10, border: '1px solid #e5e7eb', boxShadow: '0 12px 32px rgba(0,0,0,0.18)', padding: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <h3 style={{ margin: 0, flex: 1 }}>Kinship Explorer</h3>
           <button onClick={onClose} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1' }}>Close</button>
@@ -146,4 +150,5 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
       </div>
     </div>
   );
+  return createPortal(el, document.body);
 }

@@ -128,7 +128,7 @@ export default function AdminTrees({ embedded } = {}) {
         <button onClick={() => { setOffset(0); load(); }} style={{ padding: '6px 10px' }}>Search</button>
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 800 }}>
+        <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '100%' }}>
           <colgroup>
             <col style={{ width: colWidths.title }} />
             <col style={{ width: colWidths.status }} />
@@ -213,7 +213,7 @@ export default function AdminTrees({ embedded } = {}) {
                   {/* Restore only when tree is archived or pending admin deletion */}
                   <button onClick={() => handleArchive(t.id, false)} disabled={!(t.deletedAt || t.pendingAdminDeletion)} style={{ marginRight: 6, padding: '4px 8px' }}>{(t.deletedAt || t.pendingAdminDeletion) ? 'Restore' : 'Restore'}</button>
                   {/* Admin permanent delete removes from DB */}
-                  <button onClick={() => { if (!window.confirm('Permanently delete this tree from the database? This cannot be undone.')) return; Admin.deleteTree(t.id, true).then(() => load()).catch(e => console.error(e)); }} style={{ marginRight: 6, padding: '4px 8px', background: '#ef4444', color: '#fff' }}>Delete Permanently</button>
+                  <button onClick={() => { if (!window.confirm('Permanently delete this tree from the database? This cannot be undone.')) return; Admin.deleteTree(t.id, true).then(() => load()).catch(e => console.error(e)); }} style={{ marginRight: 6, padding: '4px 8px', background: '#ef4444', color: '#fff' }}>Delete</button>
                 </td>
               </tr>
             ))}

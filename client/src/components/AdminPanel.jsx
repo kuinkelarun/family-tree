@@ -84,21 +84,23 @@ export default function AdminPanel({ onClose, page = false, adminUnsaved, setAdm
         <div style={{ minWidth: 1200, width: '100%', height: 2, background: '#e5e7eb', marginTop: 12 }}></div>
         <div style={{ marginTop: 12 }}>
           {/* Full-width content to match main page layout (no maxWidth constraint) */}
-          <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 12, background: '#fff' }}>
-            {tab === 'severities' && (
-              <AdminRuleSeverities embedded adminUnsaved={adminUnsaved} setAdminUnsaved={setAdminUnsaved} />
-            )}
-            {tab === 'queue' && (
-              <AdminRecomputeJobs embedded />
-            )}
-            {tab === 'trees' && (
-              <AdminTrees embedded />
-            )}
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 12, background: '#fff', boxSizing: 'border-box', width: '100%', maxWidth: 1200 }}>
+              {tab === 'severities' && (
+                <AdminRuleSeverities embedded adminUnsaved={adminUnsaved} setAdminUnsaved={setAdminUnsaved} />
+              )}
+              {tab === 'queue' && (
+                <AdminRecomputeJobs embedded />
+              )}
+              {tab === 'trees' && (
+                <AdminTrees embedded />
+              )}
             {!tab && (
               <div style={{ padding: 16, color: '#6b7280' }}>
                 Select a section above to manage validation rules or view the recompute queue.
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>

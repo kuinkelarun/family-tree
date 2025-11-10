@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Trees } from '../utils/api.js';
+import { createPortal } from 'react-dom';
+import { useModalAccessibility } from '../utils/modalHelpers.js';
 
 export default function ArchivedModal({ open, onClose, onRestored }) {
   const [items, setItems] = useState([]);
@@ -10,7 +12,14 @@ export default function ArchivedModal({ open, onClose, onRestored }) {
     setLoading(true); setError('');
     try {
       const res = await Trees.archived();
-      setItems(Array.isArray(res) ? res : []);
+      // Accept either an array or an object with an `items` array (defensive for API shape differences)
+      let list = [];
+      if (Array.isArray(res)) list = res;
+      else if (res && Array.isArray(res.items)) list = res.items;
+      else {
+        console.warn('[ArchivedModal] unexpected archived response shape', res);
+      }
+      setItems(list);
     } catch (e) { console.error('[ArchivedModal] load', e); setError('Failed to load archived trees'); }
     finally { setLoading(false); }
   }
@@ -19,9 +28,16 @@ export default function ArchivedModal({ open, onClose, onRestored }) {
     if (open) load(); else setItems([]);
   }, [open]);
 
+  // Always create the ref and wire up accessibility hooks so hooks run in a stable order
+  const panelRef = useRef(null);
+  useModalAccessibility(open, onClose, panelRef);
+
   if (!open) return null;
 
-  return (
+  // guard portal creation in environments where `document` may be undefined
+  if (typeof document === 'undefined') return null;
+
+  const el = (
     <div
       role="dialog"
       aria-modal="true"
@@ -31,7 +47,7 @@ export default function ArchivedModal({ open, onClose, onRestored }) {
         background: 'rgba(15, 23, 42, 0.35)', backdropFilter: 'blur(6px) saturate(120%)', WebkitBackdropFilter: 'blur(6px) saturate(120%)'
       }}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(980px, 96vw)', maxHeight: '86vh', overflow: 'auto', background: 'rgba(255,255,255,0.58)', border: '1px solid rgba(255,255,255,0.7)', borderRadius: 14, boxShadow: '0 24px 60px rgba(0,0,0,0.35)', backdropFilter: 'blur(14px) saturate(160%)', WebkitBackdropFilter: 'blur(14px) saturate(160%)', padding: 16 }}>
+      <div ref={panelRef} onClick={(e) => e.stopPropagation()} style={{ width: 'min(980px, 96vw)', maxHeight: '86vh', overflow: 'auto', background: 'rgba(255,255,255,0.58)', border: '1px solid rgba(255,255,255,0.7)', borderRadius: 14, boxShadow: '0 24px 60px rgba(0,0,0,0.35)', backdropFilter: 'blur(14px) saturate(160%)', WebkitBackdropFilter: 'blur(14px) saturate(160%)', padding: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
           <strong style={{ fontSize: 15 }}>Archived Trees</strong>
           <button onClick={() => onClose && onClose()} aria-label="Close archived" style={{ background: 'transparent', border: 'none', fontSize: 16, cursor: 'pointer' }}>✕</button>
@@ -80,4 +96,5 @@ export default function ArchivedModal({ open, onClose, onRestored }) {
       </div>
     </div>
   );
+  return createPortal(el, document.body);
 }

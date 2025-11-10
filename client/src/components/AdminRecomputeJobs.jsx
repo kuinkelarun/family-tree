@@ -72,7 +72,7 @@ export default function AdminRecomputeJobs({ onClose, embedded = false }) {
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto', minWidth: 900 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto', minWidth: '100%' }}>
             <thead>
               <tr style={{ textAlign: 'left', background: '#f8fafc' }}>
                 <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Job ID</th>

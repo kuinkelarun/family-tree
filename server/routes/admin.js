@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/admin.js';
-import { getRecomputeQueue, postForceRetry, postRemoveJob, getRuleSeverities, patchRuleSeverities, deleteRuleSeverity, getValidationRulesMetadata, listTrees, getTreeDetails, postArchiveTree, postTransferTree, deleteTree, bulkTreesAction, getGlobalSeverities, patchGlobalSeverities, deleteGlobalSeverity } from '../controllers/adminController.js';
+import { getRecomputeQueue, postForceRetry, postRemoveJob, getValidationRulesMetadata, listTrees, getTreeDetails, postArchiveTree, postTransferTree, deleteTree, bulkTreesAction, getGlobalSeverities, patchGlobalSeverities, deleteGlobalSeverity } from '../controllers/adminController.js';
 import { getValidateTree } from '../controllers/validationController.js';
 
 const router = Router();
@@ -23,11 +23,7 @@ router.post('/trees/:id/transfer', requireAuth, requireAdmin, postTransferTree);
 router.delete('/trees/:id', requireAuth, requireAdmin, deleteTree);
 router.post('/trees/bulk', requireAuth, requireAdmin, bulkTreesAction);
 
-// Validation rule severity management (owner/editor check inside controllers)
-// Allow authenticated owners/editors to manage severities; controllers enforce tree-level permissions.
-router.get('/trees/:treeId/severities', requireAuth, getRuleSeverities);
-router.patch('/trees/:treeId/severities', requireAuth, patchRuleSeverities);
-router.delete('/trees/:treeId/severities/:ruleId', requireAuth, deleteRuleSeverity);
+// Per-tree severity endpoints removed; use global severities instead (admins only).
 // Rule metadata is safe to expose to authenticated users (no tree data)
 router.get('/validation/rules', requireAuth, getValidationRulesMetadata);
 // Global severities (admins only)

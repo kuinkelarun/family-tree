@@ -51,17 +51,8 @@ async function run() {
     const withGlobal = validateProposedRelationship(graph, String(B._id), String(A._id), 'parent', { mode: 'create', severityOverrides: combined });
     console.log('Validation with global severities applied:', withGlobal.ok ? 'ok' : 'not ok', withGlobal);
 
-    // Now add a per-tree override to make no-cycle -> off
-    tree.validationConfig = tree.validationConfig || {};
-    tree.validationConfig.severities = new Map([['no-cycle', 'off']]);
-    await tree.save();
-    console.log('Added per-tree override: no-cycle -> off');
-
-    const treeSevRaw = tree.validationConfig?.severities;
-    const treeSev = treeSevRaw instanceof Map ? Object.fromEntries(treeSevRaw.entries()) : (treeSevRaw && typeof treeSevRaw === 'object' ? { ...treeSevRaw } : {});
-    const merged = { ...globalSev, ...treeSev };
-    const withPerTree = validateProposedRelationship(graph, String(B._id), String(A._id), 'parent', { mode: 'create', severityOverrides: merged });
-    console.log('Validation with global + per-tree (per-tree should win):', withPerTree.ok ? 'ok' : 'not ok', withPerTree);
+  // Per-tree overrides are no longer supported in this deployment (global-only severities).
+  console.log('Per-tree overrides are removed; only global severities are applied.');
 
   } catch (e) {
     console.error('globalSeverityFlowSmoke failed', e);
