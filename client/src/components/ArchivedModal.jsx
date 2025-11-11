@@ -92,7 +92,7 @@ export default function ArchivedModal({ open, onClose, onRestored }) {
                       </button>
                       <button
                         onClick={async () => {
-                          if (!window.confirm('Delete this tree? This will send a request to admins for final removal and will be removed from your archived list.')) return;
+                          if (!window.confirm('Delete this tree? It will be removed from your archived list.')) return;
                           try {
                             await Trees.requestAdminDelete(t._id);
                             // Remove from local list so owner no longer sees it in Archived
