@@ -43,9 +43,11 @@ export default function KinshipPanel({ open, onClose, members = [], treeId, canQ
       setLoading(true);
       setResultAB(null);
       setResultBA(null);
+      // Limit kinship inference to members currently present on the canvas (where a position exists)
+      const canvasMemberIds = (members || []).filter(m => m && m.position && typeof m.position.x === 'number' && typeof m.position.y === 'number').map(m => String(m._id));
       const [resAB, resBA] = await Promise.all([
-        Trees.kinship(treeId, a, b, depth, locale, includePronouns),
-        Trees.kinship(treeId, b, a, depth, locale, includePronouns),
+        Trees.kinship(treeId, a, b, depth, locale, includePronouns, canvasMemberIds),
+        Trees.kinship(treeId, b, a, depth, locale, includePronouns, canvasMemberIds),
       ]);
       setResultAB(resAB);
       setResultBA(resBA);

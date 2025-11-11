@@ -51,7 +51,8 @@ export default function TreeBoard({
   layoutBusy = false,
   controlsDisabled = false,
   showToast = null,
-}) {
+    onExport, // optional export handler (e.g., Export PNG)
+  }) {
   const controlled = Array.isArray(extNodes) && Array.isArray(extEdges);
   const [nodesLocal, setNodesLocal, onNodesChangeLocal] = useNodesState(initialNodes);
   const [edgesLocal, setEdgesLocal, onEdgesChangeLocal] = useEdgesState(initialEdges);
@@ -613,35 +614,18 @@ export default function TreeBoard({
           Drag to pan, scroll to zoom, connect nodes to add edges
         </span>
 
-        {/* Right-aligned, responsive legend: items will wrap on small widths */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 11, color: '#64748b', justifyContent: 'flex-end', flexWrap: 'wrap', minWidth: 0, maxWidth: '48%' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 2, background: '#f97316', borderRadius: 1 }}></div>
-            parent
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 2, background: '#f97316', borderRadius: 1 }}></div>
-            child
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 2, background: '#ec4899', borderRadius: 1 }}></div>
-            spouse
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 2, background: '#10b981', borderRadius: 1 }}></div>
-            sibling
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 14, height: 2, background: '#8b5cf6', borderRadius: 1 }}></div>
-            custom
-          </span>
-        </div>
+        {/* Legend moved to floating top-right toolbar so it remains visible in maximized view */}
 
+        {typeof onExport === 'function' ? (
+          <button onClick={onExport} disabled={!nodes || nodes.length === 0} style={{ padding: '6px 10px', borderRadius: 6, background: (nodes && nodes.length) ? '#0ea5e9' : '#94a3b8', color: '#fff', border: 'none', marginRight: 6 }}>
+            Export PNG
+          </button>
+        ) : null}
         <button onClick={() => setMaximized((m) => !m)} disabled={controlsDisabled} style={{ padding: '6px 10px', borderRadius: 6, background: controlsDisabled ? '#94a3b8' : '#0f172a', color: '#fff', border: 'none', cursor: controlsDisabled ? 'not-allowed' : 'pointer' }}>
           {maximized ? 'Exit Fullscreen' : 'Maximize'}
         </button>
       </div>
-      <div ref={exportRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative', height: '100%' }}>
+  <div ref={exportRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative', height: '100%' }}>
       {flowReady ? (
       <ReactFlow
         nodes={nodes}
@@ -686,6 +670,31 @@ export default function TreeBoard({
         <Background variant="dots" gap={16} size={1} />
       </ReactFlow>
       ) : null}
+      {/* Floating vertical legend (top-right) — compact / narrow variant so it fits in maximized view */}
+      <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: 6, zIndex: 250, alignItems: 'flex-end' }}>
+        <div style={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(0,0,0,0.06)', padding: 6, borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 64 }}>
+          <button title="parent" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', background: 'transparent', border: 'none', cursor: 'default', whiteSpace: 'nowrap' }}>
+            <div style={{ width: 10, height: 4, background: '#f97316', borderRadius: 2 }}></div>
+            <span style={{ fontSize: 11, color: '#374151' }}>parent</span>
+          </button>
+          <button title="child" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', background: 'transparent', border: 'none', cursor: 'default', whiteSpace: 'nowrap' }}>
+            <div style={{ width: 10, height: 4, background: '#f97316', borderRadius: 2 }}></div>
+            <span style={{ fontSize: 11, color: '#374151' }}>child</span>
+          </button>
+          <button title="spouse" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', background: 'transparent', border: 'none', cursor: 'default', whiteSpace: 'nowrap' }}>
+            <div style={{ width: 10, height: 4, background: '#ec4899', borderRadius: 2 }}></div>
+            <span style={{ fontSize: 11, color: '#374151' }}>spouse</span>
+          </button>
+          <button title="sibling" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', background: 'transparent', border: 'none', cursor: 'default', whiteSpace: 'nowrap' }}>
+            <div style={{ width: 10, height: 4, background: '#10b981', borderRadius: 2 }}></div>
+            <span style={{ fontSize: 11, color: '#374151' }}>sibling</span>
+          </button>
+          <button title="custom" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', background: 'transparent', border: 'none', cursor: 'default', whiteSpace: 'nowrap' }}>
+            <div style={{ width: 10, height: 4, background: '#8b5cf6', borderRadius: 2 }}></div>
+            <span style={{ fontSize: 11, color: '#374151' }}>custom</span>
+          </button>
+        </div>
+      </div>
       {/* Alignment guides overlay (screen-space) with smooth fade */}
       {(() => {
         const z = viewport?.zoom || 1;

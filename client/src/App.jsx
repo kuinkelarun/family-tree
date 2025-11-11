@@ -50,6 +50,24 @@ function App() {
   const prevPositionsRef = useRef(null); // { positions: { id -> {x,y} }, viewport }
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [slotHover, setSlotHover] = useState(false);
+
+  // Members that are on the canvas and connected to the family graph (i.e., referenced by at least one edge)
+  const canvasConnectedMembers = useMemo(() => {
+    try {
+      const eds = edges || [];
+      return (members || []).filter((m) => {
+        if (!m || !m._id) return false;
+        if (!hasPosVal(m.position)) return false; // must be on canvas
+        const mid = String(m._id);
+        // Consider connected if any edge references this member as source or target
+        for (const e of eds) {
+          if (!e) continue;
+          if (String(e.source) === mid || String(e.target) === mid) return true;
+        }
+        return false;
+      });
+    } catch (e) { return []; }
+  }, [members, edges]);
   
 
   async function checkApi() {
@@ -2113,8 +2131,8 @@ function App() {
                   <button onClick={() => setArchivedOpen(true)} title="View archived trees" style={{ marginLeft: 6, padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1', flexShrink: 0 }}>Archived</button>
                 )}
                 <button title="Refresh list" onClick={loadMyTrees} style={{ padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1' }}>↻</button>
-                <button onClick={() => setShowKinship(true)} disabled={!treeId || !members.length} style={{ padding: '6px 10px', borderRadius: 6, background: (treeId && members.length) ? '#6b7280' : '#94a3b8', color: '#fff', border: 'none' }}>Kinship</button>
-                <button onClick={handleExportPng} disabled={!nodes.length} style={{ padding: '6px 10px', borderRadius: 6, background: nodes.length ? '#0ea5e9' : '#94a3b8', color: '#fff', border: 'none', flexShrink: 0 }}>Export PNG</button>
+                <button onClick={() => setShowKinship(true)} disabled={!treeId || !canvasConnectedMembers.length} style={{ padding: '6px 10px', borderRadius: 6, background: (treeId && canvasConnectedMembers.length) ? '#6b7280' : '#94a3b8', color: '#fff', border: 'none' }}>Kinship</button>
+                {/* Export moved into canvas controls so it's available in Maximize view */}
                 {/* Logout group with email above, aligned right */}
                 <div style={{ position: 'relative', display: 'inline-flex' }}>
                   <span style={{ position: 'absolute', right: 0, bottom: '100%', marginBottom: 2, color: '#1f2937', fontSize: 12 }}>{currentUser?.email}</span>
@@ -2136,6 +2154,7 @@ function App() {
           edges={previewEdge ? [...edges, previewEdge] : edges}
           setNodes={setNodes}
           setEdges={setEdges}
+          onExport={handleExportPng}
           onAddPersonAt={isAuthed && treeId && canEdit ? handleAddPersonAt : undefined}
           canAdd={!!(isAuthed && myTrees && myTrees.length > 0 && treeId && canEdit)}
           onConnect={isAuthed && canEdit ? handleConnectEdge : undefined}
@@ -2250,7 +2269,7 @@ function App() {
           <KinshipPanel
             open={showKinship}
             onClose={() => setShowKinship(false)}
-            members={members}
+            members={canvasConnectedMembers}
             treeId={treeId}
             canQuery={!!(token && treeId)}
           />
