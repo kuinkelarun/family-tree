@@ -84,8 +84,9 @@ export async function patchGlobalSeverities(req, res) {
     }
     let cfg = await AdminConfig.findOne({ key: 'globalValidationSeverities' });
     if (!cfg) cfg = new AdminConfig({ key: 'globalValidationSeverities', value: {} });
-    // Merge: updates may set to default; caller should send the canonical desired map
-    cfg.value = { ...(cfg.value || {}), ...updates };
+  // Treat the incoming `updates` as the canonical desired global severities map
+  // Replace the stored value so callers can clear overrides by omitting keys.
+  cfg.value = { ...(updates || {}) };
     await cfg.save();
     res.json({ ok: true, severities: cfg.value });
   } catch (e) { res.status(500).json({ error: e.message }); }

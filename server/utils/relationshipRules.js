@@ -204,9 +204,13 @@ export function validateProposedRelationship(graph, fromId, toId, type, options 
   }
 
   // r2: at most two parents for a child
-  if (type === 'parent') {
-    const currentParents = Array.from(parentsOf.get(fromId) || []);
-    if (!currentParents.includes(toId) && currentParents.length >= 2) {
+  // r2: at most two parents for a child. Normalize whether caller passed 'parent' or 'child'
+  if (type === 'parent' || type === 'child') {
+    // Determine childId and addingParentId regardless of orientation
+    const childId = type === 'parent' ? fromId : toId;
+    const addingParentId = type === 'parent' ? toId : fromId;
+    const currentParents = Array.from(parentsOf.get(childId) || []);
+    if (!currentParents.includes(addingParentId) && currentParents.length >= 2) {
       errors.push('Member already has 2 parents');
       ruleIds.push('max-two-parents');
     }
@@ -398,9 +402,17 @@ export function validateProposedRelationship(graph, fromId, toId, type, options 
         if (suppressAffinalMsg) {
           // A more specific rule already communicated the contradiction; skip adding another
         } else if ((type === 'parent' || type === 'child') && dist === 1) {
-          // Step-parent direct parent/child link: allow but warn
-          warnings.push(`Direct ${type} link between step-parent and step-child: ${nameFrom} is spouse of ${ancName(a)} (a parent of ${nameTo}). Ensure this is intended; this counts toward the two-parent limit.`);
-          ruleIds.push('warn-direct-step-parent-link');
+          // Step-parent direct parent/child link: allow but warn.
+          // Make this context-sensitive: if adding this parent would NOT increase the child's parent
+          // count above 2 (common case: adding a spouse as a second parent), suppress the warning.
+          // Otherwise emit the usual warning so callers can see potential capacity problems.
+          const childId = (type === 'parent') ? fromId : toId;
+          const addingParentId = (type === 'parent') ? toId : fromId;
+          const currentParents = parentsOf.get(childId) || new Set();
+          if (!currentParents.has(addingParentId) && (currentParents.size + 1) > 2) {
+            warnings.push(`Direct ${type} link between step-parent and step-child: ${nameFrom} is spouse of ${ancName(a)} (a parent of ${nameTo}). Ensure this is intended; this counts toward the two-parent limit.`);
+            ruleIds.push('warn-direct-step-parent-link');
+          }
         } else {
           errors.push(`Invalid connection: ${nameFrom} is the spouse of ${ancName(a)} (an ancestor of ${nameTo}); cannot be set as ${type}.`);
           ruleIds.push('no-direct-affinal-ancestor-descendant');
@@ -418,8 +430,14 @@ export function validateProposedRelationship(graph, fromId, toId, type, options 
         if (shared) {
           const dist = ancOfTo.get(a);
           if ((type === 'parent' || type === 'child') && dist === 1) {
-            warnings.push(`Direct ${type} link between step-parent and step-child: ${nameFrom} is a co-spouse of ${ancName(a)} (a parent of ${nameTo}). Ensure this is intended; this counts toward the two-parent limit.`);
-            ruleIds.push('warn-direct-step-parent-link');
+            // Co-spouse (step-parent) direct parent/child link — apply same context-sensitive rule
+            const childId = (type === 'parent') ? fromId : toId;
+            const addingParentId = (type === 'parent') ? toId : fromId;
+            const currentParents = parentsOf.get(childId) || new Set();
+            if (!currentParents.has(addingParentId) && (currentParents.size + 1) > 2) {
+              warnings.push(`Direct ${type} link between step-parent and step-child: ${nameFrom} is a co-spouse of ${ancName(a)} (a parent of ${nameTo}). Ensure this is intended; this counts toward the two-parent limit.`);
+              ruleIds.push('warn-direct-step-parent-link');
+            }
           } else {
             errors.push(`Invalid connection: ${nameFrom} is a co-spouse of ${ancName(a)} (an ancestor of ${nameTo}); cannot be set as ${type}.`);
             ruleIds.push('no-direct-co-spouse-of-ancestor');
@@ -440,6 +458,11 @@ export function validateProposedRelationship(graph, fromId, toId, type, options 
     // If no direct match, just keep original classification
     const classificationIds = matchedRuleIds.length ? matchedRuleIds : ruleIds;
     let suppressed = false;
+    // Certain structural rules must always remain errors (cannot be downgraded by admin overrides)
+    if (classificationIds.includes('max-two-parents')) {
+      finalErrors.push(msg);
+      continue;
+    }
     for (const rid of classificationIds) {
       const sev = severityOverrides[rid];
       if (sev === 'off') { suppressed = true; break; }

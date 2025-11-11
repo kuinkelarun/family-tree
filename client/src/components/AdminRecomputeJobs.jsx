@@ -59,16 +59,11 @@ export default function AdminRecomputeJobs({ onClose, embedded = false }) {
         <div>Loading…</div>
       ) : (
         <>
+        {/* Top info row: keep Refresh at the top-right like before */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 13, color: '#6b7280' }}>Total: {total}</div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button onClick={load} style={{ padding: '6px 8px', borderRadius: 6, marginRight: 8 }}>Refresh</button>
-            <label style={{ fontSize: 13 }}>Per page:</label>
-            <select value={limit} onChange={(e) => setLimit(parseInt(e.target.value, 10))}>
-              {[10,25,50,100].map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-            <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Prev</button>
-            <button disabled={(page - 1) * limit + jobs.length >= total} onClick={() => setPage(p => p + 1)}>Next</button>
+          <div style={{ marginLeft: 'auto' }}>
+            <button onClick={load} style={{ padding: '6px 8px', borderRadius: 6, marginLeft: 8 }}>Refresh</button>
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -104,6 +99,18 @@ export default function AdminRecomputeJobs({ onClose, embedded = false }) {
             ))}
           </tbody>
         </table>
+        </div>
+
+        {/* Footer: showing range + pagination/refresh controls (matches AdminTrees layout) */}
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontSize: 13, color: '#6b7280' }}>
+            {total === 0 ? 'Showing 0 of 0' : `Showing ${(page - 1) * limit + 1} - ${Math.min(total, (page - 1) * limit + jobs.length)} of ${total}`}
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button onClick={load} style={{ padding: '6px 8px', borderRadius: 6, marginRight: 8 }}>Refresh</button>
+            <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Prev</button>
+            <button disabled={(page - 1) * limit + jobs.length >= total} onClick={() => setPage(p => p + 1)}>Next</button>
+          </div>
         </div>
         </>
       )}

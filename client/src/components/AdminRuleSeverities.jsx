@@ -63,7 +63,9 @@ export default function AdminRuleSeverities({ onClose, embedded = false, adminUn
     setError('');
     setGlobalSaving(true);
     try {
-      await Admin.patchGlobalSeverities(globalSeverities);
+      console.log('[AdminRuleSeverities] Saving global severities:', globalSeverities);
+      const res = await Admin.patchGlobalSeverities(globalSeverities);
+      console.log('[AdminRuleSeverities] Save response:', res);
       await loadGlobal();
       if (typeof setAdminUnsaved === 'function') setAdminUnsaved(false);
     } catch (e) { setError(e.message || String(e)); }
@@ -108,7 +110,9 @@ export default function AdminRuleSeverities({ onClose, embedded = false, adminUn
     if (!modalOpenRule) return;
     setModalSaving(true);
     try {
-      await Admin.patchGlobalSeverities({ [modalOpenRule]: modalSeverity });
+      console.log('[AdminRuleSeverities] Applying modal update', modalOpenRule, modalSeverity);
+      const res = await Admin.patchGlobalSeverities({ [modalOpenRule]: modalSeverity });
+      console.log('[AdminRuleSeverities] Apply response:', res);
       await loadGlobal();
       setModalOpenRule(null);
     } catch (e) {
@@ -119,6 +123,7 @@ export default function AdminRuleSeverities({ onClose, embedded = false, adminUn
   }
 
 
+  
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -150,6 +155,9 @@ export default function AdminRuleSeverities({ onClose, embedded = false, adminUn
               const globalVal = (id && globalSeverities && globalSeverities[id]) ? globalSeverities[id] : null;
               const effective = globalVal || def || 'error';
               const displayId = id || '(unknown rule id)';
+              // compute colors: stronger background when there's a global override, subtle when it's the default
+              const overrideBg = globalVal ? (globalVal === 'error' ? '#fee2e2' : (globalVal === 'warn' ? '#fffbeb' : '#ecfccb')) : null;
+              const defaultBg = (def === 'error') ? '#fff7f7' : (def === 'warn' ? '#fffded' : '#f7fff0');
               return (
                 <tr
                   key={displayId + JSON.stringify(r)}
@@ -163,12 +171,7 @@ export default function AdminRuleSeverities({ onClose, embedded = false, adminUn
                   }}
                 >
                   <td style={{ padding: 8, fontSize: 12, textAlign: 'left', verticalAlign: 'top' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ fontWeight: 600 }}>{displayId}</div>
-                      {globalVal && globalVal !== def ? (
-                        <div title={`Global override: ${globalVal}`} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fce7f3', color: '#9f1239', fontWeight: 700 }}>GLOBAL</div>
-                      ) : null}
-                    </div>
+                    <div style={{ fontWeight: 600 }}>{displayId}</div>
                   </td>
                   <td style={{ padding: 8, fontSize: 12, color: '#6b7280', textAlign: 'left', verticalAlign: 'top' }}>
                     {(typeof r === 'string') ? '' : (r.description || '')}
@@ -178,7 +181,8 @@ export default function AdminRuleSeverities({ onClose, embedded = false, adminUn
                       aria-label={`Severity for ${displayId}`}
                       value={globalVal || def || 'error'}
                       onChange={(e) => handleChange(id, e.target.value)}
-                      style={{ padding: '4px 8px', borderRadius: 6, width: 96, fontWeight: 600, background: globalVal ? (globalVal === 'error' ? '#fee2e2' : (globalVal === 'warn' ? '#fffbeb' : '#ecfccb')) : 'transparent', border: '1px solid rgba(0,0,0,0.08)' }}
+                      style={{ padding: '4px 8px', borderRadius: 6, width: 96, fontWeight: 600, background: (globalVal ? overrideBg : defaultBg), border: '1px solid rgba(0,0,0,0.08)' }}
+                      title={globalVal ? `Global override: ${globalVal}` : `Default severity: ${def}`}
                     >
                       <option value="error">error</option>
                       <option value="warn">warn</option>

@@ -287,6 +287,12 @@ function App() {
       const commonChildren = [...p1Children].filter(cId => p2Children.has(cId));
 
       if (commonChildren.length > 0) {
+        // Debug: log family unit detection in dev
+        try {
+          if (import.meta?.env?.MODE !== 'production') {
+            console.log('[mapTreeToGraph] Creating marriage point', { pairKey, parents: [p1Id, p2Id], commonChildren });
+          }
+        } catch (e) {}
         // Define marriage point id up-front
         const marriagePointId = `m-${pairKey}`;
         let marriagePointPos = null;
@@ -355,18 +361,27 @@ function App() {
           data: { bundle: false, type: 'parent-connector' },
         });
 
-        // Also add the spouse edge between the parents
-        const dx = p2Pos.x - p1Pos.x;
-        const isP2Right = dx >= 0;
+        // Also add the spouse edge between the parents.
+        // Use deterministic lexicographic ordering for the source->target ids so the
+        // edge direction never flips due to transient position changes. Handles are
+        // assigned to visually indicate left->right but the canonical source is
+        // stable (sorted id).
+  const ordered = [String(p1Id), String(p2Id)].sort();
+        const leftId = ordered[0];
+        const rightId = ordered[1];
+        // Determine which visual node is on the right for handle placement
+  const visualRight = (p2Pos.x >= p1Pos.x) ? p2Id : p1Id;
+  const sourceHandle = (String(leftId) === String(visualRight)) ? 'right-source' : 'right-source';
+  const targetHandle = (String(rightId) === String(visualRight)) ? 'left-target' : 'left-target';
         allEdges.push({
           id: `e-${pairKey}-spouse`,
-          source: p1Id,
-          target: p2Id,
+          source: leftId,
+          target: rightId,
           type: 'smoothstep',
           label: 'spouse',
           data: { type: 'spouse', bundle: false },
-          sourceHandle: isP2Right ? 'right-source' : 'left-source',
-          targetHandle: isP2Right ? 'left-target' : 'right-target',
+          sourceHandle,
+          targetHandle,
           labelStyle: { fill: '#111827', fontSize: 12, fontWeight: 600 },
           labelBgStyle: { fill: '#ffffff', fillOpacity: 0.95, stroke: RELATIONSHIP_COLORS.spouse, strokeWidth: 1 },
           labelBgPadding: [3, 4],
@@ -1280,6 +1295,66 @@ function App() {
     if (!treeId) return;
     console.log(`[handleConnectEdge] Connection initiated: ${params.source} (${params.sourceHandle}) -> ${params.target} (${params.targetHandle})`);
 
+    // Helper: compute current parent ids for a given child id using loaded `members`, and
+    // also by inspecting the current `edges` and `nodes` (covers marriage-point virtual edges).
+    function getParentIdsFromMembers(childId) {
+      const ids = new Set();
+      if (!childId) return ids;
+      const childStr = String(childId);
+
+      // 1) Parents recorded on other members as rel.type === 'parent'
+      for (const m of members || []) {
+        for (const r of m.relationships || []) {
+          try {
+            const relId = String((r.relative && r.relative._id) || r.relative);
+            if (r.type === 'parent' && relId === childStr) ids.add(String(m._id));
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
+      // 2) Reciprocal entries on the child (type === 'child')
+      const child = (members || []).find((m) => String(m._id) === childStr);
+      if (child) {
+        for (const r of child.relationships || []) {
+          try {
+            if (r.type === 'child') ids.add(String((r.relative && r.relative._id) || r.relative));
+          } catch (e) {}
+        }
+      }
+
+      // 3) Inspect current edges: find edges whose target is the child
+      //    - If source is a marriage point (id starts with 'm-'), collect its parents from nodes
+      //    - If edge.data.type === 'parent' or markerEnd exists and points to child, treat source as parent
+      try {
+        for (const ed of edges || []) {
+          try {
+            if (String(ed.target) !== childStr) continue;
+            const src = String(ed.source || '');
+            if (src.startsWith('m-')) {
+              // find marriage node to extract parents
+              const mp = (nodes || []).find(n => String(n.id) === src);
+              const mpParents = mp?.data?.parents || [];
+              for (const p of mpParents) ids.add(String(p));
+            } else {
+              const t = String((ed.data && ed.data.type) || '').toLowerCase();
+              if (t === 'parent') {
+                ids.add(src);
+              } else if (ed.markerEnd) {
+                // If edge has a markerEnd (arrow at target), interpret as direction -> target
+                ids.add(src);
+              }
+            }
+          } catch (e) { /* ignore per-edge errors */ }
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      return ids;
+    }
+
     // If initiating from a marriage point (visual hub), automatically create child relationships
     // from both parents to the target member (skipping duplicates).
     try {
@@ -1304,6 +1379,19 @@ function App() {
 
   const ops = [];
   const validationFailures = [];
+        // Pre-check: if the target already has two parents, and adding any of these parents
+        // would increase the count above 2, block early to avoid unnecessary server calls.
+        try {
+          const existingParentIds = getParentIdsFromMembers(tgt);
+          // Count how many of the marriage parents are new
+          const newParentCandidates = (parents || []).filter(p => !existingParentIds.has(String(p)));
+          if (existingParentIds.size + newParentCandidates.length > 2) {
+            showToast('Cannot add child relationship(s): target already has two parents');
+            return;
+          }
+        } catch (e) {
+          // ignore pre-check errors and proceed to server validation
+        }
         for (const parentId of parents) {
           // skip self-connections
           if (String(parentId) === tgt) continue;
@@ -1392,6 +1480,8 @@ function App() {
 
     // Default behavior: open relationship picker for manual relationship creation
     console.log(`[handleConnectEdge] Opening picker for connection: ${params.source} (${params.sourceHandle}) -> ${params.target} (${params.targetHandle})`);
+    // Note: do not pre-block here — allow user to choose relationship type (spouse/sibling/parent)
+    // and perform validation after selection. Server-side validation remains authoritative.
     setRelPicker({ open: true, source: params.source, target: params.target, sourceHandle: params.sourceHandle, targetHandle: params.targetHandle });
   }
 
