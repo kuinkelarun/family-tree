@@ -55,35 +55,58 @@ export default function ArchivedModal({ open, onClose, onRestored }) {
 
         {error && <div style={{ padding: 8, background: '#fff7ed', border: '1px solid #fb923c', color: '#92400e', borderRadius: 8 }}>{error}</div>}
 
-        <div style={{ overflowX: 'auto', marginTop: 8 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+        <div style={{ overflowX: 'hidden', marginTop: 8 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '25%' }} />
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '15%' }} />
+            </colgroup>
             <thead>
-              <tr style={{ textAlign: 'left', background: '#f8fafc' }}>
-                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Title</th>
-                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Owner</th>
-                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Created</th>
-                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Deleted</th>
-                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb' }}>Actions</th>
+              <tr style={{ textAlign: 'center', background: '#f8fafc' }}>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>Title</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>Owner</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>Created</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>Deleted</th>
+                <th style={{ padding: 8, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {items.map((t) => (
                 <tr key={t._id}>
-                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9' }}>{t.title}</td>
-                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9' }}>{t.ownerEmail || t.owner || '—'}</td>
-                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9' }}>{t.createdAt ? new Date(t.createdAt).toLocaleString() : ''}</td>
-                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9' }}>{t.deletedAt ? new Date(t.deletedAt).toLocaleString() : ''}</td>
-                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9' }}>
-                    <button onClick={async () => { try { await Trees.restore(t._id); await load(); onRestored && onRestored(); } catch (e) { console.error(e); setError('Restore failed'); } }} style={{ marginRight: 8, padding: '6px 10px' }}>Restore</button>
-                      <button onClick={async () => {
-                        if (!window.confirm('Delete this tree? This will send a request to admins for final removal and will be removed from your archived list.')) return;
-                        try {
-                          await Trees.requestAdminDelete(t._id);
-                          // Remove from local list so owner no longer sees it in Archived
-                          setItems((prev) => prev.filter((x) => String(x._id) !== String(t._id)));
-                          onRestored && onRestored('requestedDelete');
-                        } catch (e) { console.error(e); setError('Delete request failed'); }
-                      }} style={{ padding: '6px 10px', background: '#ef4444', color: '#fff', border: 'none' }}>Delete</button>
+                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{t.title}</td>
+                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{t.ownerEmail || t.owner || '—'}</td>
+                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{t.createdAt ? new Date(t.createdAt).toLocaleString() : ''}</td>
+                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{t.deletedAt ? new Date(t.deletedAt).toLocaleString() : ''}</td>
+                  <td style={{ padding: 8, borderBottom: '1px solid #f1f5f9', overflow: 'hidden', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', whiteSpace: 'nowrap', justifyContent: 'center' }}>
+                      <button
+                        onClick={async () => { try { await Trees.restore(t._id); await load(); onRestored && onRestored(); } catch (e) { console.error(e); setError('Restore failed'); } }}
+                        title="Restore"
+                        aria-label={`Restore ${t.title || 'tree'}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 34, padding: '0 10px', boxSizing: 'border-box', borderRadius: 6, border: '1px solid rgba(0,0,0,0.06)', background: '#ffffff', cursor: 'pointer', flexShrink: 0, fontSize: 13 }}
+                      >
+                        Restore
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!window.confirm('Delete this tree? This will send a request to admins for final removal and will be removed from your archived list.')) return;
+                          try {
+                            await Trees.requestAdminDelete(t._id);
+                            // Remove from local list so owner no longer sees it in Archived
+                            setItems((prev) => prev.filter((x) => String(x._id) !== String(t._id)));
+                            onRestored && onRestored('requestedDelete');
+                          } catch (e) { console.error(e); setError('Delete request failed'); }
+                        }}
+                        title="Delete"
+                        aria-label={`Request delete ${t.title || 'tree'}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 34, padding: '0 10px', boxSizing: 'border-box', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', flexShrink: 0, fontSize: 13 }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
