@@ -2025,7 +2025,7 @@ function App() {
     if (!treeId) return;
     const title = treeMeta?.title || 'this tree';
     const confirmed = window.confirm(
-      `Archive "${title}"?\n\nThis will soft-delete (archive) the tree. You can restore it later from Archived.`
+      `Remove "${title}"?\n\nThis will remove (archive) the tree. You can restore it later from Archived.`
     );
     if (!confirmed) return;
     try {
@@ -2038,7 +2038,7 @@ function App() {
       setMembers([]);
       setTreeMeta(null);
       await loadMyTrees();
-      showToast('Tree archived');
+  showToast('Tree removed');
     } catch (e) {
       showToast(`Delete failed: ${e.message}`);
     }
@@ -2125,7 +2125,7 @@ function App() {
                   ))}
                 </select>
                 {isOwner && treeId && (
-                  <button onClick={handleDeleteTree} title="Archive this tree" style={{ padding: '6px 10px', borderRadius: 6, background: '#dc2626', color: '#fff', border: 'none', flexShrink: 0 }}>Archive</button>
+                  <button onClick={handleDeleteTree} title="Remove this tree" style={{ padding: '6px 10px', borderRadius: 6, background: '#dc2626', color: '#fff', border: 'none', flexShrink: 0 }}>Remove</button>
                 )}
                 {isAuthed && (
                   <button onClick={() => setArchivedOpen(true)} title="View archived trees" style={{ marginLeft: 6, padding: '6px 10px', borderRadius: 6, background: '#e2e8f0', color: '#111', border: '1px solid #cbd5e1', flexShrink: 0 }}>Archived</button>
