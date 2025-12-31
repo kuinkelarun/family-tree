@@ -605,7 +605,7 @@ export default function TreeBoard({
           title={!canAdd ? 'Create or select a tree to add node.' : undefined}
           style={{ padding: '6px 10px', borderRadius: 6, background: canAdd ? '#1f6feb' : '#c7d2fe', color: '#fff', border: 'none', cursor: canAdd ? 'pointer' : 'not-allowed' }}
         >
-          + Add Node
+          Add Node
         </button>
         <button onClick={onAutoLayout} disabled={layoutBusy || controlsDisabled} style={{ padding: '6px 10px', borderRadius: 6, background: (layoutBusy || controlsDisabled) ? '#94a3b8' : '#475569', color: '#fff', border: 'none', cursor: (layoutBusy || controlsDisabled) ? 'not-allowed' : 'pointer' }}>
           {layoutBusy ? 'Applying…' : (layoutActive ? 'Revert Layout' : 'Auto Layout')}

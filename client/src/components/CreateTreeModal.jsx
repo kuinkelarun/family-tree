@@ -57,7 +57,7 @@ export default function CreateTreeModal({ open, onClose, onCreated }) {
     >
       <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 96vw)', maxHeight: '86vh', overflow: 'auto', background: 'rgba(255,255,255,0.58)', border: '1px solid rgba(255,255,255,0.7)', borderRadius: 14, boxShadow: '0 24px 60px rgba(0,0,0,0.35)', backdropFilter: 'blur(14px) saturate(160%)', WebkitBackdropFilter: 'blur(14px) saturate(160%)', padding: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-          <strong style={{ fontSize: 15 }}>Create New Tree</strong>
+          <strong style={{ fontSize: 15 }}>Build New Tree</strong>
           <button onClick={() => onClose && onClose()} aria-label="Close create tree" style={{ background: 'transparent', border: 'none', fontSize: 16, cursor: 'pointer' }}>✕</button>
         </div>
 
