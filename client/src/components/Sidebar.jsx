@@ -78,15 +78,15 @@ export default function Sidebar({
               title={!canAddMember ? 'Create or select a tree to add members.' : 'Add a new member to this tree'}
               style={{ padding: '6px 10px', borderRadius: 6, background: canAddMember ? '#2563eb' : '#c7d2fe', color: '#fff', border: 'none', cursor: canAddMember ? 'pointer' : 'not-allowed' }}
             >
-              + Add New Member
+              Add New Member
             </button>
           </div>
           {/* <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, marginBottom: 8 }}>
-            Use "+ Add New Member" to create; drag to canvas or click a member to edit
+            Use "Add New Member" to create; drag to canvas or click a member to edit
           </div> */}
           {membersNotOnCanvas.length === 0 ? (
             <div style={{ padding: 12, background: '#f9fafb', borderRadius: 6, fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>
-              No members in pool. Use the "+ Add New Member" button above to create members.
+              No members in pool. Use the "Add New Member" button above to create members.
             </div>
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0 0', display: 'grid', gap: 6,
@@ -135,7 +135,7 @@ export default function Sidebar({
                       }}
                       title="Add to canvas"
                     >
-                      + Add
+                        Add
                     </button>
                   </div>
                 </li>

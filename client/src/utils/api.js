@@ -77,13 +77,19 @@ Trees.requestAdminDelete = async function requestAdminDelete(id) { return api(`/
 export const Members = {
   async create(payload) { return api('/api/members', { method: 'POST', body: payload }); },
   async update(id, payload) { 
-    console.log('[Members.update] Sending to', `/api/members/${id}`, 'payload:', payload);
+    if (import.meta.env.DEV) {
+      console.log('[Members.update] Sending to', `/api/members/${id}`, 'payload:', payload);
+    }
     const result = await api(`/api/members/${id}`, { method: 'PUT', body: payload });
-    console.log('[Members.update] Response:', result);
+    if (import.meta.env.DEV) {
+      console.log('[Members.update] Response:', result);
+    }
     return result;
   },
   async delete(id) { 
-    console.log('[Members.delete] Deleting member:', id);
+    if (import.meta.env.DEV) {
+      console.log('[Members.delete] Deleting member:', id);
+    }
     return api(`/api/members/${id}`, { method: 'DELETE' }); 
   },
 };

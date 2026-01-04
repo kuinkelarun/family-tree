@@ -5,6 +5,7 @@ import { Admin } from '../utils/api.js';
 
 // Admin UI: manage global validation severities only (per-tree overrides removed)
 export default function AdminRuleSeverities({ onClose, embedded = false, adminUnsaved, setAdminUnsaved }) {
+  const isDev = import.meta.env.DEV;
   const [globalSeverities, setGlobalSeverities] = useState({});
   const [globalLoading, setGlobalLoading] = useState(false);
   const [globalSaving, setGlobalSaving] = useState(false);
@@ -22,10 +23,10 @@ export default function AdminRuleSeverities({ onClose, embedded = false, adminUn
       // Keep whatever the server returned (if array) and log it for debugging when unexpected shapes appear
       if (Array.isArray(data.rules)) {
         // Use console.log so the message is visible in browsers that hide debug by default
-        console.log('[AdminRuleSeverities] fetched validation rules:', data.rules);
+        if (isDev) console.log('[AdminRuleSeverities] fetched validation rules:', data.rules);
         setRules(data.rules);
       } else {
-        console.warn('Validation rules metadata missing or malformed', data);
+        if (isDev) console.warn('Validation rules metadata missing or malformed', data);
         setRules([]);
       }
     } catch (e) {
@@ -63,9 +64,9 @@ export default function AdminRuleSeverities({ onClose, embedded = false, adminUn
     setError('');
     setGlobalSaving(true);
     try {
-      console.log('[AdminRuleSeverities] Saving global severities:', globalSeverities);
+      if (isDev) console.log('[AdminRuleSeverities] Saving global severities:', globalSeverities);
       const res = await Admin.patchGlobalSeverities(globalSeverities);
-      console.log('[AdminRuleSeverities] Save response:', res);
+      if (isDev) console.log('[AdminRuleSeverities] Save response:', res);
       await loadGlobal();
       if (typeof setAdminUnsaved === 'function') setAdminUnsaved(false);
     } catch (e) { setError(e.message || String(e)); }
@@ -110,9 +111,9 @@ export default function AdminRuleSeverities({ onClose, embedded = false, adminUn
     if (!modalOpenRule) return;
     setModalSaving(true);
     try {
-      console.log('[AdminRuleSeverities] Applying modal update', modalOpenRule, modalSeverity);
+      if (isDev) console.log('[AdminRuleSeverities] Applying modal update', modalOpenRule, modalSeverity);
       const res = await Admin.patchGlobalSeverities({ [modalOpenRule]: modalSeverity });
-      console.log('[AdminRuleSeverities] Apply response:', res);
+      if (isDev) console.log('[AdminRuleSeverities] Apply response:', res);
       await loadGlobal();
       setModalOpenRule(null);
     } catch (e) {

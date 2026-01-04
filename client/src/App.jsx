@@ -665,13 +665,15 @@ function App() {
     if (!id) return;
     try {
       const tree = await Trees.get(id);
-      console.log('[loadTree] Raw tree data:', tree);
-      console.log('[loadTree] Members with positions:', tree.members?.map(m => ({ 
-        id: m._id, 
-        name: m.name, 
-        pos: m.position,
-        hasPos: hasPosVal(m.position)
-      })));
+      if (import.meta.env.DEV) {
+        console.log('[loadTree] Raw tree data:', tree);
+        console.log('[loadTree] Members with positions:', tree.members?.map(m => ({ 
+          id: m._id, 
+          name: m.name, 
+          pos: m.position,
+          hasPos: hasPosVal(m.position)
+        })));
+      }
       
       const { n, e, members } = mapTreeToGraph(tree);
       setNodes(n);
@@ -679,7 +681,9 @@ function App() {
       setMembers(members);
       setTreeMeta({ owner: tree.owner, permissions: tree.permissions || [], title: tree.title || '' });
 
-      console.log(`[loadTree] Loaded ${members.length} total members, ${n.length} on canvas`);
+      if (import.meta.env.DEV) {
+        console.log(`[loadTree] Loaded ${members.length} total members, ${n.length} on canvas`);
+      }
     } catch (e) {
       showToast(`Load tree failed: ${e.message}`);
     }
@@ -1272,7 +1276,9 @@ function App() {
     try {
       const idx = nodes.length;
       const position = fallbackPosForIndex(idx);
-      console.log(`[handleAddMemberToCanvas] Adding member ${member._id} to canvas at position:`, position);
+      if (import.meta.env.DEV) {
+        console.log(`[handleAddMemberToCanvas] Adding member ${member._id} to canvas at position:`, position);
+      }
       // Update member with position - this adds them to canvas
       await Members.update(member._id, { position });
   await loadTree(treeId);
@@ -1288,7 +1294,9 @@ function App() {
   async function handleDropMember(memberId, position) {
     if (!memberId || !position) return;
     try {
-      console.log(`[handleDropMember] Dropping member ${memberId} at position:`, position);
+      if (import.meta.env.DEV) {
+        console.log(`[handleDropMember] Dropping member ${memberId} at position:`, position);
+      }
       await Members.update(memberId, { position });
       await loadTree(treeId);
       const mem = members.find(m => String(m._id) === String(memberId));
@@ -1305,13 +1313,17 @@ function App() {
 
   // Debug: log when modal state changes to verify wiring in the UI
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[UI Debug] MemberModal open =', modalOpen, 'selectedId =', selectedId);
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log('[UI Debug] MemberModal open =', modalOpen, 'selectedId =', selectedId);
+    }
   }, [modalOpen, selectedId]);
 
   async function handleConnectEdge(params) {
     if (!treeId) return;
-    console.log(`[handleConnectEdge] Connection initiated: ${params.source} (${params.sourceHandle}) -> ${params.target} (${params.targetHandle})`);
+    if (import.meta.env.DEV) {
+      console.log(`[handleConnectEdge] Connection initiated: ${params.source} (${params.sourceHandle}) -> ${params.target} (${params.targetHandle})`);
+    }
 
     // Helper: compute current parent ids for a given child id using loaded `members`, and
     // also by inspecting the current `edges` and `nodes` (covers marriage-point virtual edges).
@@ -1497,7 +1509,9 @@ function App() {
     }
 
     // Default behavior: open relationship picker for manual relationship creation
-    console.log(`[handleConnectEdge] Opening picker for connection: ${params.source} (${params.sourceHandle}) -> ${params.target} (${params.targetHandle})`);
+    if (import.meta.env.DEV) {
+      console.log(`[handleConnectEdge] Opening picker for connection: ${params.source} (${params.sourceHandle}) -> ${params.target} (${params.targetHandle})`);
+    }
     // Note: do not pre-block here — allow user to choose relationship type (spouse/sibling/parent)
     // and perform validation after selection. Server-side validation remains authoritative.
     setRelPicker({ open: true, source: params.source, target: params.target, sourceHandle: params.sourceHandle, targetHandle: params.targetHandle });
@@ -1505,7 +1519,9 @@ function App() {
 
   async function confirmRelationship(type, label) {
     try {
-      console.log(`[confirmRelationship] Creating: ${relPicker.source} -> ${relPicker.target}, type=${type}, label=${label}`);
+      if (import.meta.env.DEV) {
+        console.log(`[confirmRelationship] Creating: ${relPicker.source} -> ${relPicker.target}, type=${type}, label=${label}`);
+      }
       // Pre-validate
       const v = await Relationships.validate({ fromMemberId: relPicker.source, toMemberId: relPicker.target, type });
       if (!v.ok) {
@@ -1643,13 +1659,17 @@ function App() {
       if (typeof x !== 'number' || typeof y !== 'number') return;
       // If it's a marriagePoint (virtual helper node), only update UI state — do not persist to server
       if (node.type === 'marriagePoint') {
-        console.log(`[handleNodeDragStop] Updating marriage point position locally for ${node.id}:`, { x, y });
+        if (import.meta.env.DEV) {
+          console.log(`[handleNodeDragStop] Updating marriage point position locally for ${node.id}:`, { x, y });
+        }
         setNodes((nds) => nds.map((n) => (String(n.id) === String(node.id) ? { ...n, position: { x, y } } : n)));
         try {
           if (treeId) {
             // Persist marriage point position to tree metadata
             await Trees.updateMarriagePoint(treeId, { id: node.id, position: { x, y } });
-            console.log('[handleNodeDragStop] Marriage point position persisted to server');
+            if (import.meta.env.DEV) {
+              console.log('[handleNodeDragStop] Marriage point position persisted to server');
+            }
           }
         } catch (e) {
           console.error('[handleNodeDragStop] Failed to persist marriage point position:', e?.message || e, e);
@@ -1658,9 +1678,13 @@ function App() {
       }
 
       // For real member nodes, persist position to backend
-      console.log(`[handleNodeDragStop] Saving position for ${node.id}:`, { x, y });
+      if (import.meta.env.DEV) {
+        console.log(`[handleNodeDragStop] Saving position for ${node.id}:`, { x, y });
+      }
       await Members.update(node.id, { position: { x, y } });
-      console.log(`[handleNodeDragStop] Position saved successfully`);
+      if (import.meta.env.DEV) {
+        console.log(`[handleNodeDragStop] Position saved successfully`);
+      }
     } catch (e) {
       console.error('[handleNodeDragStop] Save position failed:', e?.message || e, e);
     }
@@ -1681,8 +1705,10 @@ function App() {
 
   // Expose a small router hook for the admin page so other scripts can update the app state
   useEffect(() => {
-    // expose setter for legacy code but keep a local popstate handler below
-    window.__app_setShowAdmin = setShowAdminPanel;
+    // Expose setter for legacy code in dev only; production should not publish console hooks.
+    if (process.env.NODE_ENV !== 'production') {
+      window.__app_setShowAdmin = setShowAdminPanel;
+    }
     // initialize from current pathname (any /admin/* route should open admin)
     setShowAdminPanel(window.location.pathname.startsWith('/admin'));
     return () => {

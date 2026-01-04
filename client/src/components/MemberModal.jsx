@@ -104,9 +104,11 @@ export default function MemberModal({
     if (location && String(location).trim()) payload.location = location;
   if (gender) payload.gender = gender;
 
-    // Debug: log the payload being submitted (helps track 400 validation issues)
-    // eslint-disable-next-line no-console
-    console.log('[MemberModal] submit payload:', payload);
+    if (import.meta.env.DEV) {
+      // Debug: log the payload being submitted (helps track 400 validation issues)
+      // eslint-disable-next-line no-console
+      console.log('[MemberModal] submit payload:', payload);
+    }
 
     onSave && onSave(payload);
   };
@@ -166,7 +168,7 @@ export default function MemberModal({
               justifyContent: 'center',
               fontSize: 18
             }}>
-              {isEdit ? '✏️' : '➕'}
+              {isEdit ? '✏️' : '👤'}
             </div>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#ffffff' }}>
               {isEdit ? 'Edit Member Details' : 'Add New Member'}

@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useModalAccessibility } from '../utils/modalHelpers.js';
 
 export default function ArchivedModal({ open, onClose, onRestored }) {
+  const isDev = import.meta.env.DEV;
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -17,7 +18,7 @@ export default function ArchivedModal({ open, onClose, onRestored }) {
       if (Array.isArray(res)) list = res;
       else if (res && Array.isArray(res.items)) list = res.items;
       else {
-        console.warn('[ArchivedModal] unexpected archived response shape', res);
+        if (isDev) console.warn('[ArchivedModal] unexpected archived response shape', res);
       }
       setItems(list);
     } catch (e) { console.error('[ArchivedModal] load', e); setError('Failed to load archived trees'); }

@@ -59,7 +59,7 @@ export default function MemberForm({ selectedMember, onSave, canSave, onClearSel
       </div>
       {!isEdit && (
         <div style={{ padding: 8, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: 12, color: '#1e40af' }}>
-          💡 Members are added to the pool first. Drag them to canvas or click "+ Add" to visualize.
+          💡 Members are added to the pool first. Drag them to canvas or click "Add" to visualize.
         </div>
       )}
       <label>

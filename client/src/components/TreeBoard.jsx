@@ -118,7 +118,9 @@ export default function TreeBoard({
         sourceHandle: `${sourceSide}-source`,
         targetHandle: `${targetSide}-target`,
       };
-      console.log(`Normalized (already correct): ${final.source} (${final.sourceHandle}) -> ${final.target} (${final.targetHandle})`);
+      if (import.meta.env.DEV) {
+        console.log(`Normalized (already correct): ${final.source} (${final.sourceHandle}) -> ${final.target} (${final.targetHandle})`);
+      }
       return final;
     }
 
@@ -132,7 +134,9 @@ export default function TreeBoard({
         sourceHandle: `${targetSide}-source`,
         targetHandle: `${sourceSide}-target`,
       };
-      console.log(`Normalized (flipped): ${final.source} (${final.sourceHandle}) -> ${final.target} (${final.targetHandle})`);
+      if (import.meta.env.DEV) {
+        console.log(`Normalized (flipped): ${final.source} (${final.sourceHandle}) -> ${final.target} (${final.targetHandle})`);
+      }
       return final;
     }
 
